@@ -174,6 +174,10 @@ function App() {
       <div className="game-grid">
         {games.map(game => (
           <div key={game.steam_id} className={`game-card ${game.achievement_count === game.total_achievements && game.total_achievements > 0 ? 'completed' : ''}`}>
+            {game.achievement_count === game.total_achievements && game.total_achievements > 0 && (
+              <div className="medal-icon">🎖️</div>
+            )}
+            
             {isLoggedIn && (
               <div className="game-actions">
                 <button className="action-btn edit-btn" onClick={() => handleEditClick(game)}>EDIT</button>
@@ -183,9 +187,6 @@ function App() {
             
             <div className="game-image">
               <img src={game.image_url} alt={game.name} style={{width: '100%', display: 'block'}} />
-              {game.achievement_count === game.total_achievements && game.total_achievements > 0 && (
-                <div className="medal-icon">🎖️</div>
-              )}
             </div>
             <div className="game-info">
               <div className="game-name" title={game.name}>{game.name}</div>
