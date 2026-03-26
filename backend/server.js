@@ -75,6 +75,7 @@ app.get('/api/games', (req, res) => {
 app.get('/api/steam/game/:steam_id', async (req, res) => {
   const { steam_id } = req.params;
   const apiKey = process.env.STEAM_API_KEY;
+  const steamUserId = process.env.STEAM_USER_ID;
 
   if (!apiKey || apiKey === 'YOUR_STEAM_API_KEY') {
     return res.status(400).json({ error: 'Steam API Key not configured' });
@@ -108,7 +109,24 @@ app.get('/api/steam/game/:steam_id', async (req, res) => {
     const achievements = schemaRes.data.game?.availableGameStats?.achievements || [];
     const totalAchievements = achievements.length;
 
-    // 3. Game Image URL
+    // 3. Fetch user's playtime from Steam
+    let steamPlaytime = null;
+    if (apiKey && steamUserId && steamUserId !== 'YOUR_STEAM_ID_64_BIT') {
+      try {
+        const playtimeRes = await axios.get(`http://api.steampowered.com/IPlayerService/GetOwnedGames/v1/?key=${apiKey}&steamid=${steamUserId}&format=json&appids_filter[0]=${steam_id}`);
+        const gameInfo = playtimeRes.data.response?.games?.[0];
+        if (gameInfo) {
+          steamPlaytime = {
+            hours: Math.floor(gameInfo.playtime_forever / 60),
+            minutes: gameInfo.playtime_forever % 60
+          };
+        }
+      } catch (err) {
+        console.warn('Steam Playtime API Error (Ignoring):', err.message);
+      }
+    }
+
+    // 4. Game Image URL
     const imageUrl = `https://cdn.akamai.steamstatic.com/steam/apps/${steam_id}/header.jpg`;
 
     res.json({
@@ -116,7 +134,8 @@ app.get('/api/steam/game/:steam_id', async (req, res) => {
       name: gameName,
       achievement_count: totalAchievements, // Always 100% completion
       total_achievements: totalAchievements,
-      image_url: imageUrl
+      image_url: imageUrl,
+      steam_playtime: steamPlaytime
     });
   } catch (error) {
     console.error('Steam API Error:', error.message);
