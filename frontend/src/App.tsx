@@ -11,6 +11,10 @@ interface Game {
   achievement_count: number;
   total_achievements: number;
   image_url: string;
+  steam_playtime?: {
+    hours: number;
+    minutes: number;
+  } | null;
 }
 
 const API_BASE = '/api';
@@ -242,6 +246,16 @@ function App() {
                 )}
                 <div style={{fontWeight: 'bold'}}>{fetchedGame.name}</div>
                 <div>Achievements: {fetchedGame.achievement_count} / {fetchedGame.total_achievements}</div>
+                
+                {fetchedGame.steam_playtime && (
+                  <div style={{marginTop: '10px', padding: '8px', border: '1px dashed var(--accent-color)', borderRadius: '4px'}}>
+                    <div style={{fontSize: '0.9rem', marginBottom: '5px'}}>🕒 Steam Playtime found: <b>{fetchedGame.steam_playtime.hours}h {fetchedGame.steam_playtime.minutes}m</b></div>
+                    <button type="button" onClick={() => {
+                      setPlaytimeHours(fetchedGame.steam_playtime!.hours);
+                      setPlaytimeMinutes(fetchedGame.steam_playtime!.minutes);
+                    }} style={{fontSize: '0.75rem', padding: '4px 8px'}}>Import Playtime</button>
+                  </div>
+                )}
                 
                 <div className="form-group" style={{marginTop: '10px'}}>
                   <label>Playtime Hours</label>
