@@ -62,7 +62,7 @@ app.post('/api/login', (req, res) => {
 
 // Get all games
 app.get('/api/games', (req, res) => {
-  db.all("SELECT * FROM games", [], (err, rows) => {
+  db.all("SELECT * FROM games ORDER BY id DESC", [], (err, rows) => {
     if (err) {
       res.status(400).json({"error":err.message});
       return;
@@ -75,27 +75,38 @@ app.get('/api/games', (req, res) => {
 app.get('/api/steam/game/:steam_id', async (req, res) => {
   const { steam_id } = req.params;
   const apiKey = process.env.STEAM_API_KEY;
-  const steamUserId = process.env.STEAM_USER_ID;
 
   if (!apiKey || apiKey === 'YOUR_STEAM_API_KEY') {
     return res.status(400).json({ error: 'Steam API Key not configured' });
   }
 
   try {
-    // 1. Fetch game details (schema) to get name and total achievements
-    const schemaRes = await axios.get(`http://api.steampowered.com/ISteamUserStats/GetSchemaForGame/v2/?key=${apiKey}&appid=${steam_id}`);
-    const gameName = schemaRes.data.game.gameName;
-    const achievements = schemaRes.data.game.availableGameStats?.achievements || [];
-    const totalAchievements = achievements.length;
-
-    // 2. Fetch user's achievements progress
-    let unlockedCount = 0;
-    if (steamUserId && steamUserId !== 'YOUR_STEAM_ID_64_BIT') {
-      const statsRes = await axios.get(`http://api.steampowered.com/ISteamUserStats/GetPlayerAchievements/v1/?key=${apiKey}&steamid=${steamUserId}&appid=${steam_id}`);
-      if (statsRes.data.playerstats.success) {
-        unlockedCount = statsRes.data.playerstats.achievements.filter(a => a.achieved === 1).length;
-      }
+    // 1. Fetch game details (schema) to get total achievements
+    let schemaRes;
+    try {
+      schemaRes = await axios.get(`http://api.steampowered.com/ISteamUserStats/GetSchemaForGame/v2/?key=${apiKey}&appid=${steam_id}`);
+    } catch (err) {
+      console.error('Steam Schema API Error:', err.response?.data || err.message);
+      return res.status(500).json({ error: 'Failed to fetch game schema from Steam. Is the Steam AppID correct?' });
     }
+    
+    // 2. Fetch Store Details to get the correct Public Name
+    let gameName = schemaRes.data.game?.gameName;
+    try {
+      const storeRes = await axios.get(`https://store.steampowered.com/api/appdetails?appids=${steam_id}`);
+      if (storeRes.data[steam_id]?.success) {
+        gameName = storeRes.data[steam_id].data.name;
+      }
+    } catch (err) {
+      console.warn('Steam Store API Error (using schema name):', err.message);
+    }
+
+    if (!gameName) {
+      return res.status(404).json({ error: 'Game not found on Steam' });
+    }
+
+    const achievements = schemaRes.data.game?.availableGameStats?.achievements || [];
+    const totalAchievements = achievements.length;
 
     // 3. Game Image URL
     const imageUrl = `https://cdn.akamai.steamstatic.com/steam/apps/${steam_id}/header.jpg`;
@@ -103,7 +114,7 @@ app.get('/api/steam/game/:steam_id', async (req, res) => {
     res.json({
       steam_id,
       name: gameName,
-      achievement_count: unlockedCount,
+      achievement_count: totalAchievements, // Always 100% completion
       total_achievements: totalAchievements,
       image_url: imageUrl
     });
@@ -113,11 +124,16 @@ app.get('/api/steam/game/:steam_id', async (req, res) => {
   }
 });
 
-// Add a game
+// Add or Update a game
 app.post('/api/games', authenticateToken, (req, res) => {
   const { steam_id, name, playtime_hours, playtime_minutes, achievement_count, total_achievements, image_url } = req.body;
-  const sql = 'INSERT INTO games (steam_id, name, playtime_hours, playtime_minutes, achievement_count, total_achievements, image_url) VALUES (?,?,?,?,?,?,?)';
+  
+  // Use INSERT OR REPLACE to handle overwrites if the steam_id already exists
+  const sql = `INSERT OR REPLACE INTO games 
+               (steam_id, name, playtime_hours, playtime_minutes, achievement_count, total_achievements, image_url) 
+               VALUES (?,?,?,?,?,?,?)`;
   const params = [steam_id, name, playtime_hours, playtime_minutes, achievement_count, total_achievements, image_url];
+  
   db.run(sql, params, function(err) {
     if (err) {
       res.status(400).json({"error": err.message});
@@ -127,6 +143,33 @@ app.post('/api/games', authenticateToken, (req, res) => {
       "message": "success",
       "data": { id: this.lastID, ...req.body }
     });
+  });
+});
+
+// Update playtime only
+app.put('/api/games/:steam_id', authenticateToken, (req, res) => {
+  const { steam_id } = req.params;
+  const { playtime_hours, playtime_minutes } = req.body;
+  
+  const sql = 'UPDATE games SET playtime_hours = ?, playtime_minutes = ? WHERE steam_id = ?';
+  db.run(sql, [playtime_hours, playtime_minutes, steam_id], function(err) {
+    if (err) {
+      res.status(400).json({"error": err.message});
+      return;
+    }
+    res.json({ "message": "updated", "changes": this.changes });
+  });
+});
+
+// Delete a game
+app.delete('/api/games/:steam_id', authenticateToken, (req, res) => {
+  const { steam_id } = req.params;
+  db.run('DELETE FROM games WHERE steam_id = ?', steam_id, function(err) {
+    if (err) {
+      res.status(400).json({"error": err.message});
+      return;
+    }
+    res.json({"message":"deleted", rows: this.changes});
   });
 });
 
