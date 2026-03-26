@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import './App.css';
+import avatarImg from './assets/avatar.jpg';
 
 interface Game {
   id?: number;
@@ -156,9 +157,17 @@ function App() {
   return (
     <div className="container">
       <header>
+        <div className="user-profile">
+          <div className="avatar-placeholder">
+            <img src={avatarImg} alt="MohandL3G" />
+          </div>
+          <span className="user-name">MohandL3G</span>
+        </div>
+        
         <div className="stats-total">
           TOTAL COMPLETED GAMES: {games.length}
         </div>
+
         <div className="header-actions">
           {!isLoggedIn ? (
             <button className="login-btn" onClick={() => setShowLogin(true)}>SIGN IN</button>
@@ -180,8 +189,8 @@ function App() {
             
             {isLoggedIn && (
               <div className="game-actions">
-                <button className="action-btn edit-btn" onClick={() => handleEditClick(game)}>EDIT</button>
-                <button className="action-btn delete-btn" onClick={() => handleDeleteGame(game.steam_id)}>DELETE</button>
+                <button className="action-btn edit-btn" onClick={() => handleEditClick(game)} title="Edit Playtime">✏️</button>
+                <button className="action-btn delete-btn" onClick={() => handleDeleteGame(game.steam_id)} title="Delete Game">🗑️</button>
               </div>
             )}
             
