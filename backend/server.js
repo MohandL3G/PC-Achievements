@@ -192,6 +192,25 @@ app.delete('/api/games/:steam_id', authenticateToken, (req, res) => {
   });
 });
 
+// Bulk delete games
+app.post('/api/games/bulk-delete', authenticateToken, (req, res) => {
+  const { steam_ids } = req.body;
+  if (!Array.isArray(steam_ids) || steam_ids.length === 0) {
+    return res.status(400).json({ error: 'No game IDs provided' });
+  }
+
+  const placeholders = steam_ids.map(() => '?').join(',');
+  const sql = `DELETE FROM games WHERE steam_id IN (${placeholders})`;
+  
+  db.run(sql, steam_ids, function(err) {
+    if (err) {
+      res.status(400).json({"error": err.message});
+      return;
+    }
+    res.json({"message": "bulk deleted", rows: this.changes});
+  });
+});
+
 app.listen(PORT, () => {
   console.log(`Server is running on port ${PORT}`);
 });

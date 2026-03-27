@@ -4,7 +4,7 @@
   --text-color: #c7d5e0;
   --accent-color: #66c0f4;
   --border-color: #e5a00d; /* Yellow border for completed games */
-  --font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  --font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
 }
 
 body {
@@ -98,9 +98,13 @@ button:hover {
 }
 
 .game-grid {
-  display: grid;
-  grid-template-columns: repeat(5, 1fr);
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
   gap: 20px;
+  width: 100%;
+  padding: 0;
+  margin: 0 auto;
 }
 
 .game-card {
@@ -111,6 +115,9 @@ button:hover {
   flex-direction: column;
   transition: transform 0.2s;
   position: relative;
+  width: calc(20% - 25px); /* Adjusted to leave more room for gaps/padding */
+  min-width: 180px; /* Lowered so 5 can fit even on 1126px width */
+  flex-shrink: 0;
 }
 
 .game-card.completed {
@@ -165,11 +172,27 @@ button:hover {
 .game-details {
   font-size: 0.8rem;
   color: #8f98a0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.game-stats-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 4px;
+}
+
+.stat-group {
+  display: flex;
+  align-items: center;
+  gap: 4px;
 }
 
 .game-actions {
   position: absolute;
-  bottom: 10px;
+  bottom: 55px; /* Lowered from 75px */
   right: 10px;
   display: flex;
   flex-direction: column;
@@ -194,7 +217,7 @@ button:hover {
   cursor: pointer;
   border: none;
   font-size: 1rem;
-  box-shadow: 0 2px 5px rgba(0,0,0,0.5);
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.5);
   transition: transform 0.1s;
 }
 
@@ -263,9 +286,100 @@ button:hover {
   gap: 10px;
 }
 
-.add-game-section {
-  background: #2a475e;
-  padding: 20px;
+.edit-mode-btn {
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  font-size: 1rem;
+  padding: 0;
+  margin-left: 5px;
+  opacity: 0.6;
+  transition: opacity 0.2s;
+}
+
+.edit-mode-btn:hover {
+  opacity: 1;
+}
+
+.edit-mode-btn.active {
+  opacity: 1;
+  color: var(--accent-color);
+  text-shadow: 0 0 8px var(--accent-color);
+}
+
+.game-card.batch-mode {
+  cursor: pointer;
+}
+
+.game-card.selected {
+  border-color: #d9534f;
+  box-shadow: 0 0 15px rgba(217, 83, 79, 0.5);
+  transform: scale(1.05);
+}
+
+.game-card.selected::after {
+  content: "✓";
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  background: #d9534f;
+  color: white;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  font-weight: bold;
+  z-index: 20;
+}
+
+.batch-actions {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.stats-star {
+  cursor: pointer;
+  display: inline-block;
+  transition:
+    transform 0.2s,
+    text-shadow 0.2s;
+  user-select: none;
+}
+
+.stats-star:hover {
+  transform: scale(1.3);
+  text-shadow: 0 0 10px var(--accent-color);
+}
+
+.stats-modal-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 20px;
+  margin-top: 20px;
+}
+
+.stat-item {
+  background: #101923;
+  padding: 15px;
   border-radius: 8px;
-  margin-bottom: 20px;
+  text-align: center;
+  border: 1px solid #323e4c;
+}
+
+.stat-value {
+  display: block;
+  font-size: 1.5rem;
+  font-weight: bold;
+  color: var(--accent-color);
+  margin-bottom: 5px;
+}
+
+.stat-label {
+  font-size: 0.8rem;
+  color: #8f98a0;
+  text-transform: uppercase;
+  letter-spacing: 1px;
 }
