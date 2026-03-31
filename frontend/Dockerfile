@@ -7,10 +7,10 @@ RUN npm install
 COPY . .
 RUN npm run build
 
-# Stage 2: Serve with Nginx
-FROM nginx:alpine
-COPY --from=build /usr/src/app/dist /usr/share/nginx/html
-COPY nginx.conf /etc/nginx/conf.d/default.conf
+# Stage 2: Serve with Angie
+FROM docker.angie.software/angie:latest
+COPY --from=build /usr/src/app/dist /usr/share/angie/html
+COPY angie.conf /etc/angie/http.d/default.conf
 
 EXPOSE 80
-CMD ["nginx", "-g", "daemon off;"]
+CMD ["angie", "-g", "daemon off;"]

@@ -11,15 +11,15 @@ services:
     restart: unless-stopped
 
   frontend:
-    image: nginx:latest
+    image: docker.angie.software/angie:latest
     container_name: pc-achievements-frontend
     volumes:
-      - ./frontend/dist:/usr/share/nginx/html:ro
-      - ./frontend/nginx.conf:/etc/nginx/conf.d/default.conf:ro
+      - ./frontend/dist:/usr/share/angie/html:ro
+      - ./frontend/angie.conf:/etc/angie/http.d/default.conf:ro
     ports:
       - "480:80"
     healthcheck:
-      test: ["CMD", "service", "nginx", "status"]
+      test: ["CMD", "angie", "-t"]
       interval: 30s
       timeout: 10s
       retries: 3
