@@ -1,6 +1,6 @@
 services:
   backend:
-    build: ./backend
+    image: gitea.mohandl3g.ddnsgeek.com/mohandl3g/pc-achievements-backend:latest
     container_name: pc-achievements-backend
     ports:
       - "5000:5000"
