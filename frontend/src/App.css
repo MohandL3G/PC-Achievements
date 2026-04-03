@@ -1,18 +1,25 @@
 :root {
-  --bg-color: #1b2838;
-  --card-bg: #16202d;
-  --text-color: #c7d5e0;
-  --accent-color: #66c0f4;
-  --border-color: #e5a00d; /* Yellow border for completed games */
+  --bg-color: #0f1722;
+  --card-bg: #1a2432;
+  --text-color: #e1e7ee;
+  --accent-color: #ff3e3e; /* Vibrant Red Accent */
+  --border-color: #ffc107; /* Keeping Gold for completed games */
   --font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
 }
 
 body {
   margin: 0;
   padding: 0;
-  background-color: var(--bg-color);
+  background-color: #0a0f16;
+  background-image: 
+    radial-gradient(circle at 50% -20%, rgba(255, 62, 62, 0.15), transparent 60%),
+    radial-gradient(circle at 0% 0%, rgba(255, 62, 62, 0.03), transparent 40%),
+    radial-gradient(circle at 100% 100%, rgba(255, 62, 62, 0.03), transparent 40%),
+    linear-gradient(180deg, #0f1722 0%, #070a0f 100%);
+  background-attachment: fixed;
   color: var(--text-color);
   font-family: var(--font-family);
+  min-height: 100vh;
 }
 
 .container {
@@ -43,7 +50,7 @@ header {
   width: 40px;
   height: 40px;
   border-radius: 50%;
-  background-color: #2a475e;
+  background-color: #1a2432;
   border: 2px solid var(--accent-color);
   display: flex;
   justify-content: center;
@@ -51,6 +58,7 @@ header {
   font-size: 0.8rem;
   color: var(--accent-color);
   overflow: hidden;
+  box-shadow: 0 0 10px rgba(255, 62, 62, 0.2);
 }
 
 .avatar-placeholder img {
@@ -62,6 +70,7 @@ header {
 .user-name {
   font-weight: bold;
   font-size: 1.1rem;
+  color: white;
 }
 
 .stats-total {
@@ -70,6 +79,7 @@ header {
   font-size: 1.2rem;
   font-weight: bold;
   color: var(--accent-color);
+  text-shadow: 0 0 15px rgba(255, 62, 62, 0.4);
 }
 
 .header-actions {
@@ -231,12 +241,12 @@ button:hover {
 }
 
 .delete-btn {
-  background-color: #d9534f;
+  background-color: #ff3e3e;
   color: white;
 }
 
 .warning-text {
-  color: #ffcc00;
+  color: #ff8e8e;
   margin-bottom: 15px;
   font-weight: bold;
 }
@@ -312,8 +322,8 @@ button:hover {
 }
 
 .game-card.selected {
-  border-color: #d9534f;
-  box-shadow: 0 0 15px rgba(217, 83, 79, 0.5);
+  border-color: white;
+  box-shadow: 0 0 20px rgba(255, 62, 62, 0.6);
   transform: scale(1.05);
 }
 
@@ -322,7 +332,7 @@ button:hover {
   position: absolute;
   top: 10px;
   right: 10px;
-  background: #d9534f;
+  background: var(--accent-color);
   color: white;
   width: 24px;
   height: 24px;
