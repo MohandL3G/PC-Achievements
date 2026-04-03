@@ -34,6 +34,9 @@ function App() {
   const [isBatchMode, setIsBatchMode] = useState(false);
   const [selectedSteamIds, setSelectedSteamIds] = useState<string[]>([]);
 
+  // Search state
+  const [searchTerm, setSearchTerm] = useState("");
+
   // Login form state
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
@@ -225,8 +228,17 @@ function App() {
 
   // Helper to determine if a game is completed
   const isCompleted = (game: Game) => {
-    return game.achievement_count === game.total_achievements || game.total_achievements === 0;
+    return (
+      game.achievement_count === game.total_achievements ||
+      game.total_achievements === 0
+    );
   };
+
+  const filteredGames = games.filter(
+    (game) =>
+      game.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      game.steam_id.includes(searchTerm),
+  );
 
   return (
     <div className="container">
@@ -253,25 +265,44 @@ function App() {
         </div>
 
         <div className="stats-total">
-          <div className="batch-actions">
-            <div>
-              TOTAL COMPLETED GAMES: {games.length}{" "}
-              {games.length > 0 && (
-                <span
-                  className="stats-star"
-                  onClick={() => setShowStatsModal(true)}
-                  title="View more stats"
-                >
-                  ⭐
-                </span>
-              )}
-            </div>
-            {isBatchMode && selectedSteamIds.length > 0 && (
-              <button className="delete-batch-btn" onClick={handleBulkDelete}>
-                DELETE SELECTED ({selectedSteamIds.length})
+          <div className="search-container">
+            <input
+              type="text"
+              placeholder="Search games..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="search-input"
+            />
+            {searchTerm && (
+              <button
+                className="clear-search"
+                onClick={() => setSearchTerm("")}
+              >
+                ✕
               </button>
             )}
           </div>
+          <div className="total-games-text">
+            TOTAL COMPLETED GAMES: {games.length}
+            {searchTerm && (
+              <span className="found-count">(Found: {filteredGames.length})</span>
+            )}
+            {games.length > 0 && (
+              <span
+                className="stats-star"
+                onClick={() => setShowStatsModal(true)}
+                title="View more stats"
+                style={{ marginLeft: "10px" }}
+              >
+                ⭐
+              </span>
+            )}
+          </div>
+          {isBatchMode && selectedSteamIds.length > 0 && (
+            <button className="delete-batch-btn" onClick={handleBulkDelete}>
+              DELETE SELECTED ({selectedSteamIds.length})
+            </button>
+          )}
         </div>
 
         <div className="header-actions">
@@ -291,7 +322,7 @@ function App() {
       </header>
 
       <div className="game-grid">
-        {games.map((game) => (
+        {filteredGames.map((game) => (
           <div
             key={game.steam_id}
             className={`game-card 
