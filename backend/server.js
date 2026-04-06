@@ -29,7 +29,8 @@ const db = new sqlite3.Database(dbPath, (err) => {
       playtime_minutes INTEGER DEFAULT 0,
       achievement_count INTEGER DEFAULT 0,
       total_achievements INTEGER DEFAULT 0,
-      image_url TEXT
+      image_url TEXT,
+      is_steam_playtime INTEGER DEFAULT 0
     )`);
   }
 });
@@ -145,13 +146,13 @@ app.get('/api/steam/game/:steam_id', async (req, res) => {
 
 // Add or Update a game
 app.post('/api/games', authenticateToken, (req, res) => {
-  const { steam_id, name, playtime_hours, playtime_minutes, achievement_count, total_achievements, image_url } = req.body;
+  const { steam_id, name, playtime_hours, playtime_minutes, achievement_count, total_achievements, image_url, is_steam_playtime } = req.body;
   
   // Use INSERT OR REPLACE to handle overwrites if the steam_id already exists
   const sql = `INSERT OR REPLACE INTO games 
-               (steam_id, name, playtime_hours, playtime_minutes, achievement_count, total_achievements, image_url) 
-               VALUES (?,?,?,?,?,?,?)`;
-  const params = [steam_id, name, playtime_hours, playtime_minutes, achievement_count, total_achievements, image_url];
+               (steam_id, name, playtime_hours, playtime_minutes, achievement_count, total_achievements, image_url, is_steam_playtime) 
+               VALUES (?,?,?,?,?,?,?,?)`;
+  const params = [steam_id, name, playtime_hours, playtime_minutes, achievement_count, total_achievements, image_url, is_steam_playtime ? 1 : 0];
   
   db.run(sql, params, function(err) {
     if (err) {
