@@ -12,6 +12,7 @@ interface Game {
   achievement_count: number;
   total_achievements: number;
   image_url: string;
+  is_steam_playtime?: number;
   steam_playtime?: {
     hours: number;
     minutes: number;
@@ -122,6 +123,10 @@ function App() {
         ...fetchedGame,
         playtime_hours: playtimeHours,
         playtime_minutes: playtimeMinutes,
+        // If playtime matches Steam playtime, mark it as a Steam import
+        is_steam_playtime: fetchedGame.steam_playtime && 
+          playtimeHours === fetchedGame.steam_playtime.hours && 
+          playtimeMinutes === fetchedGame.steam_playtime.minutes ? 1 : 0
       };
       await axios.post(`${API_BASE}/games`, gameData, {
         headers: { Authorization: `Bearer ${token}` },
@@ -179,6 +184,28 @@ function App() {
     setPlaytimeMinutes(game.playtime_minutes);
     setIsEditing(true);
     setShowAddModal(true);
+  };
+
+  const updatePlaytime = async () => {
+    if (!fetchedGame) return;
+    setIsFetching(true);
+    try {
+      const res = await axios.get(`${API_BASE}/steam/game/${fetchedGame.steam_id}`);
+      if (res.data.steam_playtime) {
+        setPlaytimeHours(res.data.steam_playtime.hours);
+        setPlaytimeMinutes(res.data.steam_playtime.minutes);
+        setFetchedGame({
+          ...fetchedGame,
+          steam_playtime: res.data.steam_playtime
+        });
+      } else {
+        alert("No Steam playtime found for this game.");
+      }
+    } catch (err) {
+      alert("Failed to fetch updated playtime from Steam.");
+    } finally {
+      setIsFetching(false);
+    }
   };
 
   const toggleGameSelection = (steamId: string) => {
@@ -501,6 +528,17 @@ function App() {
                   </div>
                 )}
                 <div style={{ fontWeight: "bold" }}>{fetchedGame.name}</div>
+                {isEditing && fetchedGame.is_steam_playtime === 1 && (
+                  <div style={{ marginTop: "10px" }}>
+                    <button 
+                      onClick={updatePlaytime} 
+                      disabled={isFetching}
+                      style={{ background: "#2a475e", fontSize: "0.8rem" }}
+                    >
+                      {isFetching ? "Updating..." : "🔄 Update Playtime from Steam"}
+                    </button>
+                  </div>
+                )}
                 {fetchedGame.total_achievements > 0 && (
                   <div>
                     Achievements: {fetchedGame.achievement_count} /{" "}
