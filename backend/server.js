@@ -148,10 +148,18 @@ app.get('/api/steam/game/:steam_id', async (req, res) => {
 app.post('/api/games', authenticateToken, (req, res) => {
   const { steam_id, name, playtime_hours, playtime_minutes, achievement_count, total_achievements, image_url, is_steam_playtime } = req.body;
   
-  // Use INSERT OR REPLACE to handle overwrites if the steam_id already exists
-  const sql = `INSERT OR REPLACE INTO games 
+  // Use INSERT ... ON CONFLICT to avoid changing the ID and moving it to the top
+  const sql = `INSERT INTO games 
                (steam_id, name, playtime_hours, playtime_minutes, achievement_count, total_achievements, image_url, is_steam_playtime) 
-               VALUES (?,?,?,?,?,?,?,?)`;
+               VALUES (?,?,?,?,?,?,?,?)
+               ON CONFLICT(steam_id) DO UPDATE SET
+                 name=excluded.name,
+                 playtime_hours=excluded.playtime_hours,
+                 playtime_minutes=excluded.playtime_minutes,
+                 achievement_count=excluded.achievement_count,
+                 total_achievements=excluded.total_achievements,
+                 image_url=excluded.image_url,
+                 is_steam_playtime=excluded.is_steam_playtime`;
   const params = [steam_id, name, playtime_hours, playtime_minutes, achievement_count, total_achievements, image_url, is_steam_playtime ? 1 : 0];
   
   db.run(sql, params, function(err) {
