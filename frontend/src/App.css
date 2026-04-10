@@ -121,7 +121,7 @@ header {
   position: relative;
   width: 280px;
   margin-right: 0;
-  transform: translateX(0); /* Absolute center baseline */
+  transform: translateX(-10px); /* Absolute center baseline */
   display: flex;
   align-items: center;
 }

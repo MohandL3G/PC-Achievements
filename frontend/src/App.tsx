@@ -89,6 +89,13 @@ function App() {
 
   const handleFetchGameInfo = async () => {
     if (!newSteamId) return;
+
+    const exists = games.find((g) => g.steam_id === newSteamId);
+    if (exists) {
+      handleEditClick(exists);
+      return;
+    }
+
     setIsFetching(true);
     try {
       const res = await axios.get(`${API_BASE}/steam/game/${newSteamId}`);
@@ -99,16 +106,7 @@ function App() {
       };
 
       setFetchedGame(gameData);
-
-      // Check if game already exists
-      const exists = games.find((g) => g.steam_id === newSteamId);
-      if (exists) {
-        setShowOverwriteWarning(true);
-        setPlaytimeHours(exists.playtime_hours);
-        setPlaytimeMinutes(exists.playtime_minutes);
-      } else {
-        setShowOverwriteWarning(false);
-      }
+      setShowOverwriteWarning(false);
     } catch (err: any) {
       alert(err.response?.data?.error || "Failed to fetch game data");
     } finally {
