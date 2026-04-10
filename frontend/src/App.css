@@ -2,8 +2,10 @@
   --bg-color: #0f1722;
   --card-bg: #1a2432;
   --text-color: #e1e7ee;
-  --accent-color: #ff3e3e; /* Vibrant Red Accent */
-  --border-color: #ffc107; /* Keeping Gold for completed games */
+  --accent-color: #ff3e3e;
+  /* Vibrant Red Accent */
+  --border-color: #ffc107;
+  /* Keeping Gold for completed games */
   --font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
 }
 
@@ -12,17 +14,13 @@ body {
   padding: 0;
   background-color: #0a0f16;
   background-image:
-    radial-gradient(
-      circle at 50% -20%,
+    radial-gradient(circle at 50% -20%,
       rgba(255, 62, 62, 0.15),
-      transparent 60%
-    ),
+      transparent 60%),
     radial-gradient(circle at 0% 0%, rgba(255, 62, 62, 0.03), transparent 40%),
-    radial-gradient(
-      circle at 100% 100%,
+    radial-gradient(circle at 100% 100%,
       rgba(255, 62, 62, 0.03),
-      transparent 40%
-    ),
+      transparent 40%),
     linear-gradient(180deg, #0f1722 0%, #070a0f 100%);
   background-attachment: fixed;
   color: var(--text-color);
@@ -70,7 +68,8 @@ header {
   color: var(--accent-color);
   overflow: hidden;
   box-shadow: 0 0 10px rgba(255, 62, 62, 0.2);
-  flex-shrink: 0; /* Prevent avatar from shrinking */
+  flex-shrink: 0;
+  /* Prevent avatar from shrinking */
 }
 
 .avatar-placeholder img {
@@ -121,14 +120,16 @@ header {
   position: relative;
   width: 280px;
   margin-right: 0;
-  transform: translateX(-10px); /* Absolute center baseline */
+  transform: translateX(-10px);
+  /* Absolute center baseline */
   display: flex;
   align-items: center;
 }
 
 .search-input {
   width: 100%;
-  padding: 8px 40px 8px 15px; /* Increase right padding for clear button */
+  padding: 8px 40px 8px 15px;
+  /* Increase right padding for clear button */
   background: rgba(26, 36, 50, 0.6);
   border: 1px solid rgba(255, 62, 62, 0.2);
   border-radius: 20px;
@@ -210,8 +211,10 @@ button:hover {
   flex-direction: column;
   transition: transform 0.2s;
   position: relative;
-  width: calc(20% - 25px); /* Adjusted to leave more room for gaps/padding */
-  min-width: 180px; /* Lowered so 5 can fit even on 1126px width */
+  width: calc(20% - 25px);
+  /* Adjusted to leave more room for gaps/padding */
+  min-width: 180px;
+  /* Lowered so 5 can fit even on 1126px width */
   flex-shrink: 0;
 }
 
@@ -244,7 +247,8 @@ button:hover {
   display: flex;
   justify-content: center;
   align-items: center;
-  box-shadow: 0 0 15px var(--border-color); /* The "glow-perfect" effect */
+  box-shadow: 0 0 15px var(--border-color);
+  /* The "glow-perfect" effect */
   z-index: 10;
   border: 2px solid var(--bg-color);
   font-size: 14px;
@@ -287,7 +291,8 @@ button:hover {
 
 .game-actions {
   position: absolute;
-  bottom: 55px; /* Lowered from 75px */
+  bottom: 55px;
+  /* Lowered from 75px */
   right: 10px;
   display: flex;
   flex-direction: column;
@@ -487,4 +492,33 @@ button:hover {
   padding: 8px 20px;
   background-color: #ff3e3e;
   font-weight: bold;
+}
+
+.update-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 15px;
+}
+
+.update-item {
+  display: flex;
+  align-items: center;
+  background: #101923;
+  border: 1px solid #323e4c;
+  padding: 12px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: border-color 0.2s;
+}
+
+.update-item:hover {
+  border-color: var(--accent-color);
+}
+
+.diff-text {
+  font-size: 0.9rem;
+  color: #8f98a0;
+  display: flex;
+  align-items: center;
 }
