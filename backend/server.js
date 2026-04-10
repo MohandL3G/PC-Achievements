@@ -65,7 +65,7 @@ app.post('/api/login', (req, res) => {
 app.get('/api/games', (req, res) => {
   db.all("SELECT * FROM games ORDER BY id DESC", [], (err, rows) => {
     if (err) {
-      res.status(400).json({"error":err.message});
+      res.status(400).json({ "error": err.message });
       return;
     }
     res.json(rows);
@@ -91,7 +91,7 @@ app.get('/api/steam/game/:steam_id', async (req, res) => {
       console.error('Steam Schema API Error:', err.response?.data || err.message);
       return res.status(500).json({ error: 'Failed to fetch game schema from Steam. Is the Steam AppID correct?' });
     }
-    
+
     // 2. Fetch Store Details to get the correct Public Name
     let gameName = schemaRes.data.game?.gameName;
     try {
@@ -147,7 +147,7 @@ app.get('/api/steam/game/:steam_id', async (req, res) => {
 // Add or Update a game
 app.post('/api/games', authenticateToken, (req, res) => {
   const { steam_id, name, playtime_hours, playtime_minutes, achievement_count, total_achievements, image_url, is_steam_playtime } = req.body;
-  
+
   // Use INSERT ... ON CONFLICT to avoid changing the ID and moving it to the top
   const sql = `INSERT INTO games 
                (steam_id, name, playtime_hours, playtime_minutes, achievement_count, total_achievements, image_url, is_steam_playtime) 
@@ -161,10 +161,10 @@ app.post('/api/games', authenticateToken, (req, res) => {
                  image_url=excluded.image_url,
                  is_steam_playtime=excluded.is_steam_playtime`;
   const params = [steam_id, name, playtime_hours, playtime_minutes, achievement_count, total_achievements, image_url, is_steam_playtime ? 1 : 0];
-  
-  db.run(sql, params, function(err) {
+
+  db.run(sql, params, function (err) {
     if (err) {
-      res.status(400).json({"error": err.message});
+      res.status(400).json({ "error": err.message });
       return;
     }
     res.json({
@@ -178,11 +178,11 @@ app.post('/api/games', authenticateToken, (req, res) => {
 app.put('/api/games/:steam_id', authenticateToken, (req, res) => {
   const { steam_id } = req.params;
   const { playtime_hours, playtime_minutes } = req.body;
-  
+
   const sql = 'UPDATE games SET playtime_hours = ?, playtime_minutes = ? WHERE steam_id = ?';
-  db.run(sql, [playtime_hours, playtime_minutes, steam_id], function(err) {
+  db.run(sql, [playtime_hours, playtime_minutes, steam_id], function (err) {
     if (err) {
-      res.status(400).json({"error": err.message});
+      res.status(400).json({ "error": err.message });
       return;
     }
     res.json({ "message": "updated", "changes": this.changes });
@@ -192,12 +192,12 @@ app.put('/api/games/:steam_id', authenticateToken, (req, res) => {
 // Delete a game
 app.delete('/api/games/:steam_id', authenticateToken, (req, res) => {
   const { steam_id } = req.params;
-  db.run('DELETE FROM games WHERE steam_id = ?', steam_id, function(err) {
+  db.run('DELETE FROM games WHERE steam_id = ?', steam_id, function (err) {
     if (err) {
-      res.status(400).json({"error": err.message});
+      res.status(400).json({ "error": err.message });
       return;
     }
-    res.json({"message":"deleted", rows: this.changes});
+    res.json({ "message": "deleted", rows: this.changes });
   });
 });
 
@@ -210,13 +210,67 @@ app.post('/api/games/bulk-delete', authenticateToken, (req, res) => {
 
   const placeholders = steam_ids.map(() => '?').join(',');
   const sql = `DELETE FROM games WHERE steam_id IN (${placeholders})`;
-  
-  db.run(sql, steam_ids, function(err) {
+
+  db.run(sql, steam_ids, function (err) {
     if (err) {
-      res.status(400).json({"error": err.message});
+      res.status(400).json({ "error": err.message });
       return;
     }
-    res.json({"message": "bulk deleted", rows: this.changes});
+    res.json({ "message": "bulk deleted", rows: this.changes });
+  });
+});
+
+// Bulk fetch Steam games playtime
+app.get('/api/steam/playtimes', async (req, res) => {
+  const apiKey = process.env.STEAM_API_KEY;
+  const steamUserId = process.env.STEAM_USER_ID;
+
+  if (!apiKey || apiKey === 'YOUR_STEAM_API_KEY' || !steamUserId || steamUserId === 'YOUR_STEAM_ID_64_BIT') {
+    return res.status(400).json({ error: 'Steam API Key or User ID not configured' });
+  }
+
+  try {
+    const playtimeRes = await axios.get(`http://api.steampowered.com/IPlayerService/GetOwnedGames/v1/?key=${apiKey}&steamid=${steamUserId}&format=json`);
+    const games = playtimeRes.data.response?.games || [];
+
+    const playtimes = {};
+    for (const g of games) {
+      playtimes[String(g.appid)] = {
+        hours: Math.floor(g.playtime_forever / 60),
+        minutes: g.playtime_forever % 60
+      };
+    }
+
+    res.json(playtimes);
+  } catch (error) {
+    console.error('Steam API Error (Bulk Playtimes):', error.message);
+    res.status(500).json({ error: 'Failed to fetch playtimes from Steam' });
+  }
+});
+
+// Bulk update playtimes
+app.put('/api/games/bulk-update-playtime', authenticateToken, (req, res) => {
+  const { updates } = req.body;
+  if (!Array.isArray(updates) || updates.length === 0) {
+    return res.status(400).json({ error: 'No updates provided' });
+  }
+
+  db.serialize(() => {
+    db.run("BEGIN TRANSACTION");
+    const stmt = db.prepare("UPDATE games SET playtime_hours = ?, playtime_minutes = ? WHERE steam_id = ?");
+
+    for (const update of updates) {
+      stmt.run(update.playtime_hours, update.playtime_minutes, update.steam_id);
+    }
+
+    stmt.finalize();
+    db.run("COMMIT", (err) => {
+      if (err) {
+        res.status(500).json({ error: 'Transaction failed', details: err.message });
+      } else {
+        res.json({ message: "bulk playtimes updated" });
+      }
+    });
   });
 });
 

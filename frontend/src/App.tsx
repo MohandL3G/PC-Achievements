@@ -19,6 +19,16 @@ interface Game {
   } | null;
 }
 
+interface PlaytimeUpdate {
+  steam_id: string;
+  name: string;
+  currentHours: number;
+  currentMinutes: number;
+  newHours: number;
+  newMinutes: number;
+  selected: boolean;
+}
+
 const API_BASE = "/api";
 
 function App() {
@@ -34,6 +44,11 @@ function App() {
   // Batch edit mode state
   const [isBatchMode, setIsBatchMode] = useState(false);
   const [selectedSteamIds, setSelectedSteamIds] = useState<string[]>([]);
+
+  // Bulk playtime updates state
+  const [showUpdatePlaytimeModal, setShowUpdatePlaytimeModal] = useState(false);
+  const [playtimeUpdates, setPlaytimeUpdates] = useState<PlaytimeUpdate[]>([]);
+  const [isUpdatingBulk, setIsUpdatingBulk] = useState(false);
 
   // Search state
   const [searchTerm, setSearchTerm] = useState("");
@@ -122,8 +137,8 @@ function App() {
         playtime_hours: playtimeHours,
         playtime_minutes: playtimeMinutes,
         // If playtime matches Steam playtime, mark it as a Steam import
-        is_steam_playtime: fetchedGame.steam_playtime && 
-          playtimeHours === fetchedGame.steam_playtime.hours && 
+        is_steam_playtime: fetchedGame.steam_playtime &&
+          playtimeHours === fetchedGame.steam_playtime.hours &&
           playtimeMinutes === fetchedGame.steam_playtime.minutes ? 1 : 0
       };
       await axios.post(`${API_BASE}/games`, gameData, {
@@ -175,6 +190,75 @@ function App() {
     }
   };
 
+  const fetchPlaytimeUpdates = async () => {
+    if (!token) return;
+    setIsUpdatingBulk(true);
+    try {
+      const res = await axios.get(`${API_BASE}/steam/playtimes`);
+      const steamPlaytimes = res.data;
+
+      const updatesList: PlaytimeUpdate[] = [];
+
+      games.forEach(game => {
+        if (game.is_steam_playtime === 1) {
+          const fetched = steamPlaytimes[game.steam_id];
+          if (fetched) {
+            // Compare playtimes
+            if (game.playtime_hours !== fetched.hours || game.playtime_minutes !== fetched.minutes) {
+              updatesList.push({
+                steam_id: game.steam_id,
+                name: game.name,
+                currentHours: game.playtime_hours,
+                currentMinutes: game.playtime_minutes,
+                newHours: fetched.hours,
+                newMinutes: fetched.minutes,
+                selected: true // By default all are selected
+              });
+            }
+          }
+        }
+      });
+
+      setPlaytimeUpdates(updatesList);
+      setShowUpdatePlaytimeModal(true);
+    } catch (err) {
+      alert("Failed to fetch steam playtimes");
+    } finally {
+      setIsUpdatingBulk(false);
+    }
+  };
+
+  const handleBulkPlaytimeUpdate = async () => {
+    const selectedUpdates = playtimeUpdates
+      .filter(u => u.selected)
+      .map(u => ({
+        steam_id: u.steam_id,
+        playtime_hours: u.newHours,
+        playtime_minutes: u.newMinutes
+      }));
+
+    if (selectedUpdates.length === 0) {
+      setShowUpdatePlaytimeModal(false);
+      return;
+    }
+
+    try {
+      await axios.put(`${API_BASE}/games/bulk-update-playtime`, { updates: selectedUpdates }, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      setShowUpdatePlaytimeModal(false);
+      fetchGames();
+    } catch (err) {
+      alert("Failed to bulk update playtimes");
+    }
+  };
+
+  const toggleUpdateSelection = (steam_id: string) => {
+    setPlaytimeUpdates(prev => prev.map(u =>
+      u.steam_id === steam_id ? { ...u, selected: !u.selected } : u
+    ));
+  };
+
   const handleEditClick = (game: Game) => {
     setFetchedGame(game);
     setNewSteamId(game.steam_id);
@@ -224,6 +308,7 @@ function App() {
     setIsEditing(false);
     setShowOverwriteWarning(false);
     setShowStatsModal(false);
+    setShowUpdatePlaytimeModal(false);
   };
 
   const calculateStats = () => {
@@ -323,10 +408,22 @@ function App() {
               </span>
             )}
           </div>
-          {isBatchMode && selectedSteamIds.length > 0 && (
-            <button className="delete-batch-btn" onClick={handleBulkDelete}>
-              DELETE SELECTED ({selectedSteamIds.length})
-            </button>
+          {isBatchMode && (
+            <div className="batch-actions" style={{ flexDirection: 'row', gap: '10px' }}>
+              <button
+                className="delete-batch-btn"
+                style={{ backgroundColor: '#2a475e', minWidth: 'auto', marginBottom: '0' }}
+                onClick={fetchPlaytimeUpdates}
+                disabled={isUpdatingBulk}
+              >
+                {isUpdatingBulk ? "FETCHING..." : "UPDATE PLAYTIMES OVERVIEW"}
+              </button>
+              {selectedSteamIds.length > 0 && (
+                <button className="delete-batch-btn" style={{ minWidth: 'auto', marginTop: '0', marginBottom: '0' }} onClick={handleBulkDelete}>
+                  DELETE SELECTED ({selectedSteamIds.length})
+                </button>
+              )}
+            </div>
           )}
         </div>
 
@@ -528,8 +625,8 @@ function App() {
                 <div style={{ fontWeight: "bold" }}>{fetchedGame.name}</div>
                 {isEditing && fetchedGame.is_steam_playtime === 1 && (
                   <div style={{ marginTop: "10px" }}>
-                    <button 
-                      onClick={updatePlaytime} 
+                    <button
+                      onClick={updatePlaytime}
                       disabled={isFetching}
                       style={{ background: "#2a475e", fontSize: "0.8rem" }}
                     >
@@ -593,7 +690,7 @@ function App() {
                     onChange={
                       setPlaytimeMinutes
                         ? (e) =>
-                            setPlaytimeMinutes(parseInt(e.target.value) || 0)
+                          setPlaytimeMinutes(parseInt(e.target.value) || 0)
                         : undefined
                     }
                   />
@@ -622,6 +719,54 @@ function App() {
                 </button>
               </div>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* Bulk Playtime Update Modal */}
+      {showUpdatePlaytimeModal && (
+        <div className="modal-overlay" onClick={() => setShowUpdatePlaytimeModal(false)}>
+          <div className="modal-content" style={{ maxWidth: '600px', maxHeight: '80vh', overflowY: 'auto' }} onClick={(e) => e.stopPropagation()}>
+            <h2 style={{ textAlign: "center", marginBottom: "20px" }}>Playtime Updates Overview</h2>
+
+            {playtimeUpdates.length === 0 ? (
+              <p style={{ textAlign: "center", color: "#8f98a0" }}>All your Steam games are already up to date!</p>
+            ) : (
+              <div className="update-list">
+                {playtimeUpdates.map(update => (
+                  <div key={update.steam_id} className="update-item" onClick={() => toggleUpdateSelection(update.steam_id)}>
+                    <input
+                      type="checkbox"
+                      checked={update.selected}
+                      readOnly
+                      style={{ cursor: "pointer", marginRight: "15px" }}
+                    />
+                    <div className="update-info">
+                      <div style={{ fontWeight: "bold", marginBottom: "4px" }}>{update.name}</div>
+                      <div className="diff-text">
+                        <span>{update.currentHours}h {update.currentMinutes}m</span>
+                        <span style={{ margin: "0 10px", color: "var(--accent-color)" }}>→</span>
+                        <span style={{ color: "white" }}>{update.newHours}h {update.newMinutes}m</span>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            <div className="modal-actions" style={{ marginTop: "30px", justifyContent: "flex-end", position: "sticky", bottom: "0", background: "var(--card-bg)" }}>
+              <button
+                style={{ background: "#4e5b6b" }}
+                onClick={() => setShowUpdatePlaytimeModal(false)}
+              >
+                Cancel
+              </button>
+              {playtimeUpdates.length > 0 && (
+                <button onClick={handleBulkPlaytimeUpdate}>
+                  Confirm Selection
+                </button>
+              )}
+            </div>
           </div>
         </div>
       )}
