@@ -11,7 +11,47 @@ const axios = require('axios');
 const app = express();
 const PORT = process.env.PORT || 5000;
 
-app.use(cors());
+if (!process.env.JWT_SECRET) {
+  console.error("FATAL ERROR: JWT_SECRET environment variable is missing.");
+  process.exit(1);
+}
+
+if (!process.env.ADMIN_PASSWORD) {
+  console.error("FATAL ERROR: ADMIN_PASSWORD environment variable is missing.");
+  process.exit(1);
+}
+
+const rateLimit = require('express-rate-limit');
+const loginLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 5, // Limit each IP to 5 login requests per 15 minutes
+  message: "Too many login attempts from this IP, please try again after 15 minutes."
+});
+
+const allowedOrigins = [
+  'https://ach.mohandl3g.ly',
+  'https://ach.mohandl3g.ddnsgeek.com',
+  'http://internal.docker',
+  'http://192.168.0.100',
+  'http://localhost',
+  'http://localhost:5173', // Vite local development
+  'http://localhost:5000'
+];
+
+app.use(cors({
+  origin: function(origin, callback) {
+    // Allow requests with no origin (like same-origin relative requests, server-to-server, or curl)
+    if (!origin) return callback(null, true);
+    
+    // Check if the exact origin is in our allowed list
+    // OR if it starts with localhost (to allow any local port)
+    if (allowedOrigins.includes(origin) || origin.startsWith('http://localhost:')) {
+      return callback(null, true);
+    }
+    
+    return callback(new Error('The CORS policy for this site does not allow access from the specified Origin.'), false);
+  }
+}));
 app.use(bodyParser.json());
 
 // Database setup
@@ -42,7 +82,7 @@ const authenticateToken = (req, res, next) => {
 
   if (token == null) return res.sendStatus(401);
 
-  jwt.verify(token, process.env.JWT_SECRET || 'secret', (err, user) => {
+  jwt.verify(token, process.env.JWT_SECRET, (err, user) => {
     if (err) return res.sendStatus(403);
     req.user = user;
     next();
@@ -50,11 +90,16 @@ const authenticateToken = (req, res, next) => {
 };
 
 // Login Route
-app.post('/api/login', (req, res) => {
+app.post('/api/login', loginLimiter, async (req, res) => {
   const { username, password } = req.body;
-  if (username === process.env.ADMIN_USERNAME && password === process.env.ADMIN_PASSWORD) {
+  if (username !== process.env.ADMIN_USERNAME) {
+    return res.status(401).send('Invalid Credentials');
+  }
+
+  const isMatch = await bcrypt.compare(password, process.env.ADMIN_PASSWORD);
+  if (isMatch) {
     const user = { name: username };
-    const accessToken = jwt.sign(user, process.env.JWT_SECRET || 'secret');
+    const accessToken = jwt.sign(user, process.env.JWT_SECRET);
     res.json({ accessToken });
   } else {
     res.status(401).send('Invalid Credentials');
