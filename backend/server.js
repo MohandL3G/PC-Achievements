@@ -9,6 +9,7 @@ const jwt = require('jsonwebtoken');
 const axios = require('axios');
 
 const app = express();
+app.set('trust proxy', 1);
 const PORT = process.env.PORT || 5000;
 
 if (!process.env.JWT_SECRET) {
@@ -39,16 +40,16 @@ const allowedOrigins = [
 ];
 
 app.use(cors({
-  origin: function(origin, callback) {
+  origin: function (origin, callback) {
     // Allow requests with no origin (like same-origin relative requests, server-to-server, or curl)
     if (!origin) return callback(null, true);
-    
+
     // Check if the exact origin is in our allowed list
     // OR if it starts with localhost (to allow any local port)
     if (allowedOrigins.includes(origin) || origin.startsWith('http://localhost:')) {
       return callback(null, true);
     }
-    
+
     return callback(new Error('The CORS policy for this site does not allow access from the specified Origin.'), false);
   }
 }));
@@ -72,8 +73,62 @@ const db = new sqlite3.Database(dbPath, (err) => {
       image_url TEXT,
       is_steam_playtime INTEGER DEFAULT 0
     )`);
+    db.run(`CREATE TABLE IF NOT EXISTS game_achievements (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      steam_id TEXT NOT NULL,
+      api_name TEXT NOT NULL,
+      display_name TEXT NOT NULL,
+      description TEXT,
+      icon_url TEXT,
+      rarity REAL DEFAULT 0,
+      UNIQUE(steam_id, api_name)
+    )`);
   }
 });
+
+async function fetchAndSaveAchievementsForGame(steam_id) {
+  const apiKey = process.env.STEAM_API_KEY;
+  if (!apiKey || apiKey === 'YOUR_STEAM_API_KEY') return;
+
+  try {
+    const schemaRes = await axios.get(`http://api.steampowered.com/ISteamUserStats/GetSchemaForGame/v2/?key=${apiKey}&appid=${steam_id}`);
+    const achievements = schemaRes.data.game?.availableGameStats?.achievements || [];
+    if (achievements.length === 0) return;
+
+    let globalPercentages = [];
+    try {
+      const globalRes = await axios.get(`http://api.steampowered.com/ISteamUserStats/GetGlobalAchievementPercentagesForApp/v2/?gameid=${steam_id}`);
+      globalPercentages = globalRes.data.achievementpercentages?.achievements || [];
+    } catch (e) {
+      console.warn('Failed to fetch global percentages for', steam_id);
+    }
+
+    db.serialize(() => {
+      db.run("BEGIN TRANSACTION");
+      const stmt = db.prepare(`INSERT INTO game_achievements 
+        (steam_id, api_name, display_name, description, icon_url, rarity) 
+        VALUES (?, ?, ?, ?, ?, ?)
+        ON CONFLICT(steam_id, api_name) DO UPDATE SET 
+          display_name=excluded.display_name,
+          description=excluded.description,
+          icon_url=excluded.icon_url,
+          rarity=excluded.rarity`);
+
+      for (const ach of achievements) {
+        const percEntry = globalPercentages.find(p => p.name === ach.name);
+        // Default to highly common if percentage isn't strictly found, to push unknowns to bottom.
+        const rarity = percEntry ? parseFloat(percEntry.percent) : 100.0;
+        stmt.run(steam_id, ach.name, ach.displayName, ach.description || '', ach.icon, rarity);
+      }
+      stmt.finalize();
+      db.run("COMMIT");
+    });
+  } catch (err) {
+    if (err.response?.status !== 400 && err.response?.status !== 403 && err.response?.status !== 404) {
+      console.error('Failed to fetch/save achievements for', steam_id, err.message);
+    }
+  }
+}
 
 // Middleware for JWT auth
 const authenticateToken = (req, res, next) => {
@@ -216,6 +271,8 @@ app.post('/api/games', authenticateToken, (req, res) => {
       "message": "success",
       "data": { id: this.lastID, ...req.body }
     });
+    // Async save achievements in the background!
+    fetchAndSaveAchievementsForGame(steam_id);
   });
 });
 
@@ -316,6 +373,35 @@ app.put('/api/games/bulk-update-playtime', authenticateToken, (req, res) => {
         res.json({ message: "bulk playtimes updated" });
       }
     });
+  });
+});
+
+// Get achievements from database
+app.get('/api/games/:steam_id/achievements', (req, res) => {
+  const { steam_id } = req.params;
+  db.all("SELECT * FROM game_achievements WHERE steam_id = ? ORDER BY rarity ASC", [steam_id], (err, rows) => {
+    if (err) return res.status(500).json({ error: err.message });
+    res.json(rows);
+  });
+});
+
+// Bulk sync all games achievements
+app.post('/api/games/sync-achievements', authenticateToken, (req, res) => {
+  db.all("SELECT DISTINCT steam_id FROM games", async (err, rows) => {
+    if (err) return res.status(500).json({ error: err.message });
+    res.json({ message: "Sync started in background for " + rows.length + " games" });
+
+    console.log(`Starting bulk sync for ${rows.length} games...`);
+    let count = 0;
+    for (const row of rows) {
+      await fetchAndSaveAchievementsForGame(row.steam_id);
+      count++;
+      if (count % 10 === 0 || count === rows.length) {
+        console.log(`Sync progress: ${count}/${rows.length} games processed.`);
+      }
+      await new Promise(r => setTimeout(r, 500)); // Be nice to Steam API
+    }
+    console.log("Bulk sync completed successfully.");
   });
 });
 
