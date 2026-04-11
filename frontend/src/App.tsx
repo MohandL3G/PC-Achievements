@@ -19,6 +19,15 @@ interface Game {
   } | null;
 }
 
+interface GameAchievement {
+  steam_id: string;
+  api_name: string;
+  display_name: string;
+  description: string;
+  icon_url: string;
+  rarity: number;
+}
+
 interface PlaytimeUpdate {
   steam_id: string;
   name: string;
@@ -66,6 +75,23 @@ function App() {
   const [isFetching, setIsFetching] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [showOverwriteWarning, setShowOverwriteWarning] = useState(false);
+
+  // View details modal state
+  const [selectedGameToView, setSelectedGameToView] = useState<Game | null>(null);
+  const [gameAchievements, setGameAchievements] = useState<GameAchievement[]>([]);
+  const [isFetchingAchievements, setIsFetchingAchievements] = useState(false);
+  const [achievementSortDesc, setAchievementSortDesc] = useState(true); // Default: Common to Rare (70% -> 1%)
+
+  // Prevent background scrolling when any modal is open
+  useEffect(() => {
+    const isAnyModalOpen = !!selectedGameToView || showUpdatePlaytimeModal || isEditing;
+    if (isAnyModalOpen) {
+      document.body.style.overflow = "hidden";
+    } else {
+      document.body.style.overflow = "unset";
+    }
+    return () => { document.body.style.overflow = "unset"; };
+  }, [selectedGameToView, showUpdatePlaytimeModal, isEditing]);
 
   useEffect(() => {
     fetchGames();
@@ -260,6 +286,33 @@ function App() {
     ));
   };
 
+  const handleGameClick = async (game: Game) => {
+    setSelectedGameToView(game);
+    setGameAchievements([]);
+    setIsFetchingAchievements(true);
+    try {
+      const res = await axios.get(`${API_BASE}/games/${game.steam_id}/achievements`);
+      setGameAchievements(res.data);
+    } catch (err) {
+      console.error("Failed to fetch achievements", err);
+    } finally {
+      setIsFetchingAchievements(false);
+    }
+  };
+
+  const handleSyncAchievements = async () => {
+    if (!token) return;
+    if (!window.confirm("Sync all existing games on the backend to grab achievements? This will run in the background.")) return;
+    try {
+      const res = await axios.post(`${API_BASE}/games/sync-achievements`, {}, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      alert(res.data.message);
+    } catch (err) {
+      alert("Failed to start sync");
+    }
+  };
+
   const handleEditClick = (game: Game) => {
     setFetchedGame(game);
     setNewSteamId(game.steam_id);
@@ -451,6 +504,13 @@ function App() {
               >
                 {isUpdatingBulk ? "FETCHING..." : "UPDATE PLAYTIMES OVERVIEW"}
               </button>
+              <button
+                className="delete-batch-btn"
+                style={{ backgroundColor: '#2a475e', minWidth: 'auto', marginBottom: '0' }}
+                onClick={handleSyncAchievements}
+              >
+                SYNC ACHIEVEMENTS
+              </button>
               {selectedSteamIds.length > 0 && (
                 <button className="delete-batch-btn" style={{ minWidth: 'auto', marginTop: '0', marginBottom: '0' }} onClick={handleBulkDelete}>
                   DELETE SELECTED ({selectedSteamIds.length})
@@ -484,33 +544,9 @@ function App() {
               ${isCompleted(game) ? "completed" : ""} 
               ${isBatchMode ? "batch-mode" : ""} 
               ${selectedSteamIds.includes(game.steam_id) ? "selected" : ""}`}
-            onClick={() => isBatchMode && toggleGameSelection(game.steam_id)}
+            onClick={() => isBatchMode ? toggleGameSelection(game.steam_id) : handleGameClick(game)}
+            style={{ cursor: "pointer" }}
           >
-            {isLoggedIn && !isBatchMode && (
-              <div className="game-actions">
-                <button
-                  className="action-btn edit-btn"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    handleEditClick(game);
-                  }}
-                  title="Edit Playtime"
-                >
-                  ✏️
-                </button>
-                <button
-                  className="action-btn delete-btn"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    handleDeleteGame(game.steam_id);
-                  }}
-                  title="Delete Game"
-                >
-                  🗑️
-                </button>
-              </div>
-            )}
-
             <div className="game-image">
               <img
                 src={game.image_url}
@@ -799,6 +835,82 @@ function App() {
                   Confirm Selection
                 </button>
               )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Game Details Modal */}
+      {selectedGameToView && (
+        <div className="modal-overlay" onClick={() => setSelectedGameToView(null)}>
+          <div className="modal-content details-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="details-header" style={{ backgroundImage: `url(${selectedGameToView.image_url})` }}>
+              <div className="details-header-overlay">
+                <h2>{selectedGameToView.name}</h2>
+                <div className="details-playtime">
+                  🕒 {selectedGameToView.playtime_hours}h {selectedGameToView.playtime_minutes}m
+                </div>
+              </div>
+            </div>
+
+            {isLoggedIn && (
+              <div className="details-actions">
+                <button
+                  onClick={() => { setSelectedGameToView(null); handleEditClick(selectedGameToView); }}
+                  style={{ background: "#2a475e", flex: 1 }}
+                >
+                  ✏️ Edit Playtime
+                </button>
+                <button
+                  onClick={() => {
+                    handleDeleteGame(selectedGameToView.steam_id);
+                    setSelectedGameToView(null);
+                  }}
+                  style={{ background: "#ff3e3e", flex: 1 }}
+                >
+                  🗑️ Delete Game
+                </button>
+              </div>
+            )}
+
+            <div className="achievements-container">
+              <div className="achievements-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 20px', background: 'rgba(0,0,0,0.2)', borderBottom: '1px solid #1a2432' }}>
+                <span style={{ fontSize: '0.85rem', color: '#8f98a0', fontWeight: 'bold', textTransform: 'uppercase' }}>Achievements</span>
+                <button 
+                  onClick={() => setAchievementSortDesc(!achievementSortDesc)}
+                  style={{ background: 'transparent', border: '1px solid #323e4c', fontSize: '0.75rem', padding: '4px 10px', borderRadius: '4px', color: '#8f98a0' }}
+                >
+                  Sort: {achievementSortDesc ? "Common ➔ Rare" : "Rare ➔ Common"}
+                </button>
+              </div>
+              {isFetchingAchievements ? (
+                <div style={{ textAlign: 'center', padding: '40px' }}>Loading achievements...</div>
+              ) : gameAchievements.length > 0 ? (
+                <div className="achievement-list">
+                  {[...gameAchievements]
+                    .sort((a, b) => achievementSortDesc ? b.rarity - a.rarity : a.rarity - b.rarity)
+                    .map(ach => (
+                    <div className="achievement-row" key={ach.api_name}>
+                      <img src={ach.icon_url} alt={ach.display_name} className="achievement-icon" />
+                      <div className="achievement-text">
+                        <div className="achievement-title">{ach.display_name}</div>
+                        <div className="achievement-desc">{ach.description}</div>
+                      </div>
+                      <div className="achievement-rarity">
+                        {ach.rarity.toFixed(1)}%
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div style={{ textAlign: 'center', padding: '40px', color: '#8f98a0' }}>
+                  No Steam Achievements available for this title.
+                </div>
+              )}
+            </div>
+
+            <div className="modal-actions" style={{ marginTop: '20px', justifyContent: 'center' }}>
+              <button onClick={() => setSelectedGameToView(null)} style={{ background: "#4e5b6b", width: '100%' }}>Close Details</button>
             </div>
           </div>
         </div>
