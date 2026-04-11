@@ -52,6 +52,7 @@ function App() {
 
   // Search state
   const [searchTerm, setSearchTerm] = useState("");
+  const [sortType, setSortType] = useState("last_added");
 
   // Login form state
   const [username, setUsername] = useState("");
@@ -350,6 +351,23 @@ function App() {
       game.steam_id.includes(searchTerm),
   );
 
+  const displayedGames = [...filteredGames];
+  if (sortType === "first_added") {
+    displayedGames.reverse();
+  } else if (sortType !== "last_added") {
+    displayedGames.sort((a, b) => {
+      if (sortType === "most_achievements") return b.achievement_count - a.achievement_count;
+      if (sortType === "least_achievements") return a.achievement_count - b.achievement_count;
+
+      const playtimeA = (a.playtime_hours * 60) + a.playtime_minutes;
+      const playtimeB = (b.playtime_hours * 60) + b.playtime_minutes;
+      if (sortType === "most_playtime") return playtimeB - playtimeA;
+      if (sortType === "least_playtime") return playtimeA - playtimeB;
+
+      return 0;
+    });
+  }
+
   return (
     <div className="container">
       <header>
@@ -375,22 +393,37 @@ function App() {
         </div>
 
         <div className="stats-total">
-          <div className="search-container">
-            <input
-              type="text"
-              placeholder="Search games..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="search-input"
-            />
-            {searchTerm && (
-              <button
-                className="clear-search"
-                onClick={() => setSearchTerm("")}
-              >
-                ✕
-              </button>
-            )}
+          <div style={{ display: "flex", gap: "10px", alignItems: "center" }}>
+            <div className="search-container">
+              <input
+                type="text"
+                placeholder="Search games..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="search-input"
+              />
+              {searchTerm && (
+                <button
+                  className="clear-search"
+                  onClick={() => setSearchTerm("")}
+                >
+                  ✕
+                </button>
+              )}
+            </div>
+            <select
+              className="sort-dropdown"
+              value={sortType}
+              onChange={(e) => setSortType(e.target.value)}
+              title="Sort Games"
+            >
+              <option value="last_added">Last Added</option>
+              <option value="first_added">First Added</option>
+              <option value="most_playtime">Most Playtime</option>
+              <option value="least_playtime">Least Playtime</option>
+              <option value="most_achievements">Most Achievements</option>
+              <option value="least_achievements">Least Achievements</option>
+            </select>
           </div>
           <div className="total-games-text">
             TOTAL COMPLETED GAMES: {games.length}
@@ -444,7 +477,7 @@ function App() {
       </header>
 
       <div className="game-grid">
-        {filteredGames.map((game) => (
+        {displayedGames.map((game) => (
           <div
             key={game.steam_id}
             className={`game-card 
