@@ -81,17 +81,18 @@ function App() {
   const [gameAchievements, setGameAchievements] = useState<GameAchievement[]>([]);
   const [isFetchingAchievements, setIsFetchingAchievements] = useState(false);
   const [achievementSortDesc, setAchievementSortDesc] = useState(true); // Default: Common to Rare (70% -> 1%)
+  const [rareAchievementsCount, setRareAchievementsCount] = useState(0);
 
   // Prevent background scrolling when any modal is open
   useEffect(() => {
-    const isAnyModalOpen = !!selectedGameToView || showUpdatePlaytimeModal || isEditing;
+    const isAnyModalOpen = !!selectedGameToView || showUpdatePlaytimeModal || isEditing || showStatsModal || showLogin || showAddModal || showOverwriteWarning;
     if (isAnyModalOpen) {
       document.body.style.overflow = "hidden";
     } else {
       document.body.style.overflow = "unset";
     }
     return () => { document.body.style.overflow = "unset"; };
-  }, [selectedGameToView, showUpdatePlaytimeModal, isEditing]);
+  }, [selectedGameToView, showUpdatePlaytimeModal, isEditing, showStatsModal, showLogin, showAddModal, showOverwriteWarning]);
 
   useEffect(() => {
     fetchGames();
@@ -365,6 +366,16 @@ function App() {
     setShowUpdatePlaytimeModal(false);
   };
 
+  const handleShowStats = async () => {
+    setShowStatsModal(true);
+    try {
+      const res = await axios.get(`${API_BASE}/stats`);
+      setRareAchievementsCount(res.data.rareAchievements);
+    } catch (err) {
+      console.error("Failed to fetch stats", err);
+    }
+  };
+
   const calculateStats = () => {
     const totalAchievements = games.reduce(
       (acc, game) => acc + game.achievement_count,
@@ -425,7 +436,12 @@ function App() {
     <div className="container">
       <header>
         <div className="user-profile">
-          <div className="avatar-placeholder">
+          <div
+            className="avatar-placeholder"
+            onClick={handleShowStats}
+            style={{ cursor: 'pointer' }}
+            title="View Stats"
+          >
             <img src={avatarImg} alt="***REMOVED***" />
           </div>
           <span className="user-name">
@@ -486,7 +502,7 @@ function App() {
             {games.length > 0 && (
               <span
                 className="stats-star"
-                onClick={() => setShowStatsModal(true)}
+                onClick={handleShowStats}
                 title="View more stats"
                 style={{ marginLeft: "10px" }}
               >
@@ -633,8 +649,8 @@ function App() {
                 <span className="stat-label">Total Games</span>
               </div>
               <div className="stat-item">
-                <span className="stat-value">{stats.perfectGames}</span>
-                <span className="stat-label">Perfect Games</span>
+                <span className="stat-value">{rareAchievementsCount}</span>
+                <span className="stat-label">Rare Achievements</span>
               </div>
               <div className="stat-item">
                 <span className="stat-value">{stats.totalAchievements}</span>
@@ -649,7 +665,7 @@ function App() {
               className="modal-actions"
               style={{ marginTop: "30px", justifyContent: "center" }}
             >
-              <button onClick={closeModals}>Close Overview</button>
+              <button onClick={() => setShowStatsModal(false)}>Close Overview</button>
             </div>
           </div>
         </div>
@@ -876,7 +892,7 @@ function App() {
             <div className="achievements-container">
               <div className="achievements-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 20px', background: 'rgba(0,0,0,0.2)', borderBottom: '1px solid #1a2432' }}>
                 <span style={{ fontSize: '0.85rem', color: '#8f98a0', fontWeight: 'bold', textTransform: 'uppercase' }}>Achievements</span>
-                <button 
+                <button
                   onClick={() => setAchievementSortDesc(!achievementSortDesc)}
                   style={{ background: 'transparent', border: '1px solid #323e4c', fontSize: '0.75rem', padding: '4px 10px', borderRadius: '4px', color: '#8f98a0' }}
                 >
@@ -890,17 +906,17 @@ function App() {
                   {[...gameAchievements]
                     .sort((a, b) => achievementSortDesc ? b.rarity - a.rarity : a.rarity - b.rarity)
                     .map(ach => (
-                    <div className="achievement-row" key={ach.api_name}>
-                      <img src={ach.icon_url} alt={ach.display_name} className="achievement-icon" />
-                      <div className="achievement-text">
-                        <div className="achievement-title">{ach.display_name}</div>
-                        <div className="achievement-desc">{ach.description}</div>
+                      <div className="achievement-row" key={ach.api_name}>
+                        <img src={ach.icon_url} alt={ach.display_name} className="achievement-icon" />
+                        <div className="achievement-text">
+                          <div className="achievement-title">{ach.display_name}</div>
+                          <div className="achievement-desc">{ach.description}</div>
+                        </div>
+                        <div className="achievement-rarity">
+                          {ach.rarity.toFixed(1)}%
+                        </div>
                       </div>
-                      <div className="achievement-rarity">
-                        {ach.rarity.toFixed(1)}%
-                      </div>
-                    </div>
-                  ))}
+                    ))}
                 </div>
               ) : (
                 <div style={{ textAlign: 'center', padding: '40px', color: '#8f98a0' }}>

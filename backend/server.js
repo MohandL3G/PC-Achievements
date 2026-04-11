@@ -405,6 +405,14 @@ app.post('/api/games/sync-achievements', authenticateToken, (req, res) => {
   });
 });
 
+// Get total stats
+app.get('/api/stats', (req, res) => {
+  db.get("SELECT COUNT(*) as rareCount FROM game_achievements WHERE rarity <= 10.0", (err, row) => {
+    if (err) return res.status(500).json({ error: err.message });
+    res.json({ rareAchievements: row.rareCount });
+  });
+});
+
 app.listen(PORT, () => {
   console.log(`Server is running on port ${PORT}`);
 });
