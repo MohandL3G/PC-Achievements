@@ -413,6 +413,22 @@ app.get('/api/stats', (req, res) => {
   });
 });
 
+// Serve frontend static files
+const publicPath = path.join(__dirname, 'public');
+app.use(express.static(publicPath));
+
+// Fallback for SPA (React) client-side routing
+app.get('*', (req, res) => {
+  if (req.path.startsWith('/api')) {
+    return res.status(404).json({ error: 'API route not found' });
+  }
+  res.sendFile(path.join(publicPath, 'index.html'), (err) => {
+    if (err) {
+      res.status(404).send('Frontend not built. Please run npm run build in the frontend directory.');
+    }
+  });
+});
+
 app.listen(PORT, () => {
   console.log(`Server is running on port ${PORT}`);
 });
