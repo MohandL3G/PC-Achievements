@@ -6,7 +6,7 @@ A full-stack web application designed to manage, track, and showcase your PC gam
 - 🎮 **Game Management**: Keep track of your local games, playtime, and custom achievement completion tracking.
 - 🔄 **Steam Integration**: Fetch and synchronize your public Steam library, game thumbnails, schema metadata, and playtime data utilizing the Steam Web API.
 - 🔒 **Secure Admin Routing**: Password-protected backend endpoints to append, modify, or bulk-delete entries from the database, tightly secured via JWT validation, rate limiting, and bcrypt hashing.
-- 🐳 **Docker Ready**: Frictionless production deployments with a predefined Docker Compose architecture routing an Angie frontend and a lightweight Express backend.
+- 🐳 **Docker Ready**: Frictionless production deployments with a single Docker image containing both frontend and backend.
 
 ## Tech Stack
 - **Frontend**: React (Vite-compiled UI using modern ES Modules).
@@ -14,34 +14,76 @@ A full-stack web application designed to manage, track, and showcase your PC gam
 - **Database**: SQLite3 (Local, lightweight file database).
 - **Security**: Bcrypt encryption, JSON Web Tokens (JWT).
 
-## Installation & Deployment
+## Deployment (Docker)
 
-### 1. Configure the Environment
-Navigate to the `backend/` directory and create or update the `.env` file to include your configurations:
+This is the recommended way to run the application for production. It uses a single Docker image containing both the frontend and the backend.
 
-```env
-PORT=5000
-STEAM_API_KEY=your_steam_api_key
-STEAM_USER_ID=your_steam_id_64_bit
-JWT_SECRET=a_very_long_secure_randomly_generated_string
-
-ADMIN_USERNAME=admin_username_of_your_choice
-# VERY IMPORTANT: Generate a bcrypt hash for your password and wrap it in SINGLE QUOTES. 
-# Single quotes prevent Docker Compose from interpreting '$$' as environment variables.
-# You can generate a hash by running: node -e "console.log(require('bcryptjs').hashSync('YourPassword', 10))"
-ADMIN_PASSWORD='$2b$10$YourGeneratedBcryptHashHere...'
-```
-
-### 2. Run via Docker Compose (Recommended)
-This application can be spun up as two containers instantly:
-
+### 1. Build the Image
+From the root directory, run:
 ```bash
-# Build the frontend and spin up both containers efficiently
-docker compose up --build -d
+docker build -t pc-achievements .
 ```
-The application will launch on your configured ports, with your `achievements.db` persistent volume being successfully mapped.
 
-### 3. Run Manually (Development)
-If you wish to view the platform locally without Docker virtualization:
-- **Backend:** `cd backend && npm install && npm start`
-- **Frontend:** `cd frontend && npm install && npm run dev`
+### 2. Run and Test Locally
+To run the container locally with your configuration:
+
+**PowerShell:**
+```powershell
+docker run -d `
+  --name pc-achievements `
+  -p 5000:5000 `
+  -v ${PWD}/backend/achievements.db:/usr/src/app/achievements.db `
+  -e STEAM_API_KEY="your_api_key" `
+  -e STEAM_USER_ID="your_steam_id" `
+  -e JWT_SECRET="your_secret" `
+  -e ADMIN_USERNAME="admin" `
+  -e ADMIN_PASSWORD='bcrypt_hash_here' `
+  pc-achievements
+```
+
+**Bash:**
+```bash
+docker run -d \
+  --name pc-achievements \
+  -p 5000:5000 \
+  -v $(pwd)/backend/achievements.db:/usr/src/app/achievements.db \
+  -e STEAM_API_KEY="your_api_key" \
+  -e STEAM_USER_ID="your_steam_id" \
+  -e JWT_SECRET="your_secret" \
+  -e ADMIN_USERNAME="admin" \
+  -e ADMIN_PASSWORD='bcrypt_hash_here' \
+  pc-achievements
+```
+
+> [!IMPORTANT]
+> **Database Persistence**: Always mount a volume to `/usr/src/app/achievements.db` to ensure your data persists when the container is updated or removed.
+
+### 3. Environment Variables
+| Variable | Description |
+| --- | --- |
+| `PORT` | The port the server runs on (default: 5000) |
+| `STEAM_API_KEY` | Your Steam Web API Key |
+| `STEAM_USER_ID` | Your 64-bit Steam ID |
+| `JWT_SECRET` | Secret key for JWT signing |
+| `ADMIN_USERNAME` | Username for the admin panel |
+| `ADMIN_PASSWORD` | **Bcrypt hash** of your admin password (use single quotes) |
+
+---
+
+## Development
+
+If you wish to run the project locally for development:
+
+1. **Backend:** 
+   ```bash
+   cd backend
+   npm install
+   npm start
+   ```
+2. **Frontend:**
+   ```bash
+   cd frontend
+   npm install
+   npm run dev
+   ```
+   *Note: Frontend in dev mode will proxy requests to `localhost:5000`.*

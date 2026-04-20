@@ -56,7 +56,7 @@ app.use(cors({
 app.use(bodyParser.json());
 
 // Database setup
-const dbPath = path.resolve(__dirname, 'achievements.db');
+const dbPath = process.env.DATABASE_PATH || path.resolve(__dirname, 'achievements.db');
 const db = new sqlite3.Database(dbPath, (err) => {
   if (err) {
     console.error('Error opening database', err.message);
@@ -410,6 +410,22 @@ app.get('/api/stats', (req, res) => {
   db.get("SELECT COUNT(*) as rareCount FROM game_achievements WHERE rarity <= 10.0", (err, row) => {
     if (err) return res.status(500).json({ error: err.message });
     res.json({ rareAchievements: row.rareCount });
+  });
+});
+
+// Serve frontend static files
+const publicPath = path.join(__dirname, 'public');
+app.use(express.static(publicPath));
+
+// Fallback for SPA (React) client-side routing
+app.get('*path', (req, res) => {
+  if (req.path.startsWith('/api')) {
+    return res.status(404).json({ error: 'API route not found' });
+  }
+  res.sendFile(path.join(publicPath, 'index.html'), (err) => {
+    if (err) {
+      res.status(404).send('Frontend not built. Please run npm run build in the frontend directory.');
+    }
   });
 });
 
