@@ -56,7 +56,7 @@ app.use(cors({
 app.use(bodyParser.json());
 
 // Database setup
-const dbPath = path.resolve(__dirname, 'achievements.db');
+const dbPath = process.env.DATABASE_PATH || path.resolve(__dirname, 'achievements.db');
 const db = new sqlite3.Database(dbPath, (err) => {
   if (err) {
     console.error('Error opening database', err.message);

@@ -6,8 +6,9 @@ services:
     ports:
       - "480:5000"
     volumes:
-      - C:\Data\AppData\ach\backend\achievements.db:/usr/src/app/achievements.db
+      - C:\Data\AppData\ach\backend:/database
     environment:
+      - DATABASE_PATH=/database/achievements.db
       - STEAM_API_KEY=***REMOVED***
       - STEAM_USER_ID=***REMOVED***
       - JWT_SECRET=***REMOVED***
