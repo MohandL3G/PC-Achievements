@@ -1,5 +1,5 @@
 # Stage 1: Build Frontend
-FROM node:18-alpine AS frontend-builder
+FROM node:20-slim AS frontend-builder
 WORKDIR /usr/src/app/frontend
 COPY frontend/package*.json ./
 RUN npm install
@@ -7,14 +7,21 @@ COPY frontend/ ./
 RUN npm run build
 
 # Stage 2: Build Backend
-FROM node:18-alpine AS backend-builder
+FROM node:20-slim AS backend-builder
+# Install build tools for native modules (sqlite3)
+RUN apt-get update && apt-get install -y \
+    python3 \
+    make \
+    g++ \
+    && rm -rf /var/lib/apt/lists/*
+
 WORKDIR /usr/src/app/backend
 COPY backend/package*.json ./
 RUN npm install
 COPY backend/ ./
 
 # Stage 3: Final Image
-FROM node:18-alpine
+FROM node:20-slim
 WORKDIR /usr/src/app
 
 # Copy backend files and dependencies

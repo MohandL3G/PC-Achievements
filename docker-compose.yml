@@ -1,28 +1,16 @@
+name: pc-achievements
 services:
-  backend:
-    build: ./backend
-    container_name: pc-achievements-backend
+  app:
+    image: mohandl3g/pc-achievements:latest
+    container_name: pc-achievements
     ports:
       - "5000:5000"
     volumes:
       - ./backend/achievements.db:/usr/src/app/achievements.db
-    env_file:
-      - ./backend/.env
-    restart: unless-stopped
-
-  frontend:
-    image: docker.angie.software/angie:latest
-    container_name: pc-achievements-frontend
-    volumes:
-      - ./frontend/dist:/usr/share/angie/html:ro
-      - ./frontend/angie.conf:/etc/angie/http.d/default.conf:ro
-    ports:
-      - "480:80"
-    healthcheck:
-      test: ["CMD", "angie", "-t"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-    depends_on:
-      - backend
+    environment:
+      - STEAM_API_KEY=0CB1FBBF177CB64C00F9B536C554C636
+      - STEAM_USER_ID=76561198423209668
+      - JWT_SECRET=nf84320qjfurqghn023qghng320f1873hgfrw9ghn-
+      - ADMIN_USERNAME=MohandL3G
+      - ADMIN_PASSWORD=$$2b$$10$$E0Eg9UkmdKUQxnGT0pPAOuEoi6Ryb1VgZRrpPFU6mCzDgo4L7WJu.
     restart: unless-stopped
