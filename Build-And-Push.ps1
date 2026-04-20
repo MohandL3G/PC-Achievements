@@ -1,8 +1,8 @@
 $ImageName = "mohandl3g/pc-achievements"
 $Tag = "latest"
-$FullImage = "$ImageName:$Tag"
+$FullImage = "${ImageName}:$Tag"
 
-Write-Host "`n[1/4] Building Docker Image: $FullImage..." -ForegroundColor Cyan
+Write-Host "`n[1/4] Building Docker Image: ${FullImage}..." -ForegroundColor Cyan
 docker build -t $FullImage .
 
 if ($LASTEXITCODE -ne 0) {
@@ -10,7 +10,7 @@ if ($LASTEXITCODE -ne 0) {
     exit $LASTEXITCODE
 }
 
-Write-Host "`n[2/4] Pushing Docker Image: $FullImage..." -ForegroundColor Cyan
+Write-Host "`n[2/4] Pushing Docker Image: ${FullImage}..." -ForegroundColor Cyan
 docker push $FullImage
 
 if ($LASTEXITCODE -ne 0) {
@@ -20,7 +20,8 @@ if ($LASTEXITCODE -ne 0) {
 
 Write-Host "`n[3/4] Cleaning up Docker build history..." -ForegroundColor Cyan
 # Removes build records (the list in Docker Desktop "Builds" tab)
-docker buildx history rm --all
+# Using 2>$null to ignore errors if this command isn't supported on your version
+docker buildx history rm --all 2>$null
 
 Write-Host "`n[4/4] Pruning builder cache..." -ForegroundColor Cyan
 # Removes the actual build cache layers
