@@ -17,7 +17,7 @@ RUN apt-get update && apt-get install -y \
 
 WORKDIR /usr/src/app/backend
 COPY backend/package*.json ./
-RUN npm install
+RUN npm install --build-from-source=sqlite3
 COPY backend/ ./
 
 # Stage 3: Final Image

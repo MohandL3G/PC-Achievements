@@ -418,7 +418,7 @@ const publicPath = path.join(__dirname, 'public');
 app.use(express.static(publicPath));
 
 // Fallback for SPA (React) client-side routing
-app.get('*', (req, res) => {
+app.get('*path', (req, res) => {
   if (req.path.startsWith('/api')) {
     return res.status(404).json({ error: 'API route not found' });
   }
