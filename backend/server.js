@@ -19,7 +19,7 @@ app.use(helmet({
   contentSecurityPolicy: {
     directives: {
       defaultSrc: ["'self'"],
-      imgSrc: ["'self'", "data:", "https://cdn.akamai.steamstatic.com"],
+      imgSrc: ["'self'", "data:", "https://cdn.akamai.steamstatic.com", "https://steamcdn-a.akamaihd.net"],
       scriptSrc: ["'self'"],
       styleSrc: ["'self'", "'unsafe-inline'"],
       objectSrc: ["'none'"],
