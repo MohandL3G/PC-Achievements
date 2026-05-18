@@ -30,16 +30,10 @@ COPY --from=backend-builder /usr/src/app/backend ./
 # Copy built frontend assets to the backend's public folder
 COPY --from=frontend-builder /usr/src/app/frontend/dist ./public
 
-# Environment variables with defaults
-ENV PORT=5000
-ENV STEAM_API_KEY=""
-ENV STEAM_USER_ID=""
-ENV JWT_SECRET="change_this_secret_in_production"
-ENV ADMIN_USERNAME="admin"
-ENV ADMIN_PASSWORD="password"
-
 # Expose the server port
 EXPOSE 5000
 
+USER node
+
 # Start the application
-CMD ["npm", "start"]
+CMD ["node", "server.js"]

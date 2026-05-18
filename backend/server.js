@@ -91,13 +91,13 @@ async function fetchAndSaveAchievementsForGame(steam_id) {
   if (!apiKey || apiKey === 'YOUR_STEAM_API_KEY') return;
 
   try {
-    const schemaRes = await axios.get(`http://api.steampowered.com/ISteamUserStats/GetSchemaForGame/v2/?key=${apiKey}&appid=${steam_id}`);
+    const schemaRes = await axios.get(`https://api.steampowered.com/ISteamUserStats/GetSchemaForGame/v2/?key=${apiKey}&appid=${steam_id}`);
     const achievements = schemaRes.data.game?.availableGameStats?.achievements || [];
     if (achievements.length === 0) return;
 
     let globalPercentages = [];
     try {
-      const globalRes = await axios.get(`http://api.steampowered.com/ISteamUserStats/GetGlobalAchievementPercentagesForApp/v2/?gameid=${steam_id}`);
+      const globalRes = await axios.get(`https://api.steampowered.com/ISteamUserStats/GetGlobalAchievementPercentagesForApp/v2/?gameid=${steam_id}`);
       globalPercentages = globalRes.data.achievementpercentages?.achievements || [];
     } catch (e) {
       console.warn('Failed to fetch global percentages for', steam_id);
@@ -137,7 +137,7 @@ const authenticateToken = (req, res, next) => {
 
   if (token == null) return res.sendStatus(401);
 
-  jwt.verify(token, process.env.JWT_SECRET, (err, user) => {
+  jwt.verify(token, process.env.JWT_SECRET, { algorithms: ['HS256'] }, (err, user) => {
     if (err) return res.sendStatus(403);
     req.user = user;
     next();
@@ -154,7 +154,7 @@ app.post('/api/login', loginLimiter, async (req, res) => {
   const isMatch = await bcrypt.compare(password, process.env.ADMIN_PASSWORD);
   if (isMatch) {
     const user = { name: username };
-    const accessToken = jwt.sign(user, process.env.JWT_SECRET);
+    const accessToken = jwt.sign(user, process.env.JWT_SECRET, { expiresIn: '24h' });
     res.json({ accessToken });
   } else {
     res.status(401).send('Invalid Credentials');
@@ -186,7 +186,7 @@ app.get('/api/steam/game/:steam_id', async (req, res) => {
     // 1. Fetch game details (schema) to get total achievements
     let schemaRes;
     try {
-      schemaRes = await axios.get(`http://api.steampowered.com/ISteamUserStats/GetSchemaForGame/v2/?key=${apiKey}&appid=${steam_id}`);
+      schemaRes = await axios.get(`https://api.steampowered.com/ISteamUserStats/GetSchemaForGame/v2/?key=${apiKey}&appid=${steam_id}`);
     } catch (err) {
       console.error('Steam Schema API Error:', err.response?.data || err.message);
       return res.status(500).json({ error: 'Failed to fetch game schema from Steam. Is the Steam AppID correct?' });
@@ -214,7 +214,7 @@ app.get('/api/steam/game/:steam_id', async (req, res) => {
     let steamPlaytime = null;
     if (apiKey && steamUserId && steamUserId !== 'YOUR_STEAM_ID_64_BIT') {
       try {
-        const playtimeRes = await axios.get(`http://api.steampowered.com/IPlayerService/GetOwnedGames/v1/?key=${apiKey}&steamid=${steamUserId}&format=json&appids_filter[0]=${steam_id}`);
+        const playtimeRes = await axios.get(`https://api.steampowered.com/IPlayerService/GetOwnedGames/v1/?key=${apiKey}&steamid=${steamUserId}&format=json&appids_filter[0]=${steam_id}`);
         const gameInfo = playtimeRes.data.response?.games?.[0];
         if (gameInfo) {
           steamPlaytime = {
@@ -332,7 +332,7 @@ app.get('/api/steam/playtimes', async (req, res) => {
   }
 
   try {
-    const playtimeRes = await axios.get(`http://api.steampowered.com/IPlayerService/GetOwnedGames/v1/?key=${apiKey}&steamid=${steamUserId}&format=json`);
+    const playtimeRes = await axios.get(`https://api.steampowered.com/IPlayerService/GetOwnedGames/v1/?key=${apiKey}&steamid=${steamUserId}&format=json`);
     const games = playtimeRes.data.response?.games || [];
 
     const playtimes = {};

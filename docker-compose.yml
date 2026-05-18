@@ -6,12 +6,6 @@ services:
     ports:
       - "480:5000"
     volumes:
-      - C:\Data\AppData\ach\backend:/database
-    environment:
-      - DATABASE_PATH=/database/achievements.db
-      - STEAM_API_KEY=0CB1FBBF177CB64C00F9B536C554C636
-      - STEAM_USER_ID=76561198423209668
-      - JWT_SECRET=nf84320qjfurqghn023qghng320f1873hgfrw9ghn-
-      - ADMIN_USERNAME=MohandL3G
-      - ADMIN_PASSWORD=$$2b$$10$$E0Eg9UkmdKUQxnGT0pPAOuEoi6Ryb1VgZRrpPFU6mCzDgo4L7WJu.
+      - ./database:/database
+    env_file: .env
     restart: unless-stopped
