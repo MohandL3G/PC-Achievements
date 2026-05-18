@@ -1,11 +1,30 @@
 name: pc-achievements
 services:
+  caddy:
+    image: caddy:latest
+    container_name: pc-achievements-caddy
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      app:
+        condition: service_started
+    restart: unless-stopped
+
   app:
     image: mohandl3g/pc-achievements:latest
     container_name: pc-achievements
-    ports:
-      - "480:5000"
+    expose:
+      - "5000"
     volumes:
       - ./database:/database
     env_file: .env
     restart: unless-stopped
+
+volumes:
+  caddy_data:
+  caddy_config:

@@ -1,0 +1,7 @@
+# PC-Achievements Caddyfile
+# Replace the domain below with your actual domain for automatic HTTPS.
+# For local development, use :80 to serve plain HTTP.
+
+ach.mohandl3g.ly, ach.mohandl3g.ddnsgeek.com {
+    reverse_proxy app:5000
+}
