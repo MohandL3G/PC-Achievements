@@ -442,10 +442,10 @@ function App() {
             style={{ cursor: 'pointer' }}
             title="View Stats"
           >
-            <img src={avatarImg} alt="MohandL3G" />
+            <img src={avatarImg} alt="***REMOVED***" />
           </div>
           <span className="user-name">
-            MohandL3G
+            ***REMOVED***
             {isLoggedIn && (
               <button
                 className={`edit-mode-btn ${isBatchMode ? "active" : ""}`}

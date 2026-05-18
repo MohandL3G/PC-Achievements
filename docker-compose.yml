@@ -9,9 +9,9 @@ services:
       - C:\Data\AppData\ach\backend:/database
     environment:
       - DATABASE_PATH=/database/achievements.db
-      - STEAM_API_KEY=0CB1FBBF177CB64C00F9B536C554C636
-      - STEAM_USER_ID=76561198423209668
-      - JWT_SECRET=nf84320qjfurqghn023qghng320f1873hgfrw9ghn-
-      - ADMIN_USERNAME=MohandL3G
-      - ADMIN_PASSWORD=$$2b$$10$$E0Eg9UkmdKUQxnGT0pPAOuEoi6Ryb1VgZRrpPFU6mCzDgo4L7WJu.
+      - STEAM_API_KEY=***REMOVED***
+      - STEAM_USER_ID=***REMOVED***
+      - JWT_SECRET=***REMOVED***
+      - ADMIN_USERNAME=***REMOVED***
+      - ADMIN_PASSWORD=***REMOVED***
     restart: unless-stopped

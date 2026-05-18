@@ -24,12 +24,12 @@ You can download the `docker-compose.yml` file directly to your machine:
 
 **Using curl:**
 ```bash
-curl -O https://forgejo.mohandl3g.ly/MohandL3G/PC-Achievements/raw/branch/main/docker-compose.yml
+curl -O https://forgejo.mohandl3g.ly/***REMOVED***/PC-Achievements/raw/branch/main/docker-compose.yml
 ```
 
 **Using wget:**
 ```bash
-wget https://forgejo.mohandl3g.ly/MohandL3G/PC-Achievements/raw/branch/main/docker-compose.yml
+wget https://forgejo.mohandl3g.ly/***REMOVED***/PC-Achievements/raw/branch/main/docker-compose.yml
 ```
 
 *Alternatively*, you can create a `docker-compose.yml` file manually and paste the following configuration:
