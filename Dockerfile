@@ -9,7 +9,7 @@ RUN npm run build
 # Stage 2: Build Backend
 FROM node:20-slim AS backend-builder
 # Install build tools for native modules (sqlite3)
-RUN apt-get update && apt-get install -y \
+RUN apt-get update && apt-get install -y --no-install-recommends \
     python3 \
     make \
     g++ \
@@ -30,16 +30,13 @@ COPY --from=backend-builder /usr/src/app/backend ./
 # Copy built frontend assets to the backend's public folder
 COPY --from=frontend-builder /usr/src/app/frontend/dist ./public
 
-# Environment variables with defaults
-ENV PORT=5000
-ENV STEAM_API_KEY=""
-ENV STEAM_USER_ID=""
-ENV JWT_SECRET="change_this_secret_in_production"
-ENV ADMIN_USERNAME="admin"
-ENV ADMIN_PASSWORD="password"
-
 # Expose the server port
 EXPOSE 5000
 
+USER node
+
+HEALTHCHECK --interval=30s --timeout=5s --start-period=15s --retries=3 \
+  CMD node -e "require('http').get({host:'localhost',port:5000,path:'/api/games',timeout:3000},r=>process.exit(r.statusCode>=200?0:1)).on('error',()=>process.exit(1))"
+
 # Start the application
-CMD ["npm", "start"]
+CMD ["node", "server.js"]

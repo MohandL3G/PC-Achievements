@@ -1,938 +1,276 @@
-import React, { useState, useEffect } from "react";
-import axios from "axios";
-import "./App.css";
-import avatarImg from "./assets/avatar.jpg";
-
-interface Game {
-  id?: number;
-  steam_id: string;
-  name: string;
-  playtime_hours: number;
-  playtime_minutes: number;
-  achievement_count: number;
-  total_achievements: number;
-  image_url: string;
-  is_steam_playtime?: number;
-  steam_playtime?: {
-    hours: number;
-    minutes: number;
-  } | null;
-}
-
-interface GameAchievement {
-  steam_id: string;
-  api_name: string;
-  display_name: string;
-  description: string;
-  icon_url: string;
-  rarity: number;
-}
-
-interface PlaytimeUpdate {
-  steam_id: string;
-  name: string;
-  currentHours: number;
-  currentMinutes: number;
-  newHours: number;
-  newMinutes: number;
-  selected: boolean;
-}
-
-const API_BASE = "/api";
+import { useState, useEffect, useCallback } from "react"
+import { Toaster, toast } from "sonner"
+import { useAuth } from "@/hooks/useAuth"
+import { useGames } from "@/hooks/useGames"
+import { useAchievements } from "@/hooks/useAchievements"
+import { Header } from "@/components/Header"
+import { GameCard } from "@/components/GameCard"
+import { LoginModal } from "@/components/LoginModal"
+import { AddGameModal } from "@/components/AddGameModal"
+import { StatsModal } from "@/components/StatsModal"
+import { GameDetailsModal } from "@/components/GameDetailsModal"
+import { BulkPlaytimeModal } from "@/components/BulkPlaytimeModal"
+import type { Game, PlaytimeUpdate } from "@/types"
 
 function App() {
-  const [games, setGames] = useState<Game[]>([]);
-  const [isLoggedIn, setIsLoggedIn] = useState(false);
-  const [showLogin, setShowLogin] = useState(false);
-  const [showAddModal, setShowAddModal] = useState(false);
-  const [showStatsModal, setShowStatsModal] = useState(false);
-  const [token, setToken] = useState<string | null>(
-    localStorage.getItem("token"),
-  );
+  const { token, isLoggedIn, login, logout } = useAuth()
+  const { games, loading, fetchGames, deleteGame, bulkDelete, fetchSteamPlaytimes, bulkUpdatePlaytimes, syncAchievements } = useGames()
+  const { rareCount, fetchRareCount } = useAchievements()
 
-  // Batch edit mode state
-  const [isBatchMode, setIsBatchMode] = useState(false);
-  const [selectedSteamIds, setSelectedSteamIds] = useState<string[]>([]);
-
-  // Bulk playtime updates state
-  const [showUpdatePlaytimeModal, setShowUpdatePlaytimeModal] = useState(false);
-  const [playtimeUpdates, setPlaytimeUpdates] = useState<PlaytimeUpdate[]>([]);
-  const [isUpdatingBulk, setIsUpdatingBulk] = useState(false);
-
-  // Search state
-  const [searchTerm, setSearchTerm] = useState("");
-  const [sortType, setSortType] = useState("last_added");
-
-  // Login form state
-  const [username, setUsername] = useState("");
-  const [password, setPassword] = useState("");
-
-  // Add/Edit game state
-  const [newSteamId, setNewSteamId] = useState("");
-  const [fetchedGame, setFetchedGame] = useState<Game | null>(null);
-  const [playtimeHours, setPlaytimeHours] = useState(0);
-  const [playtimeMinutes, setPlaytimeMinutes] = useState(0);
-  const [isFetching, setIsFetching] = useState(false);
-  const [isEditing, setIsEditing] = useState(false);
-  const [showOverwriteWarning, setShowOverwriteWarning] = useState(false);
-
-  // View details modal state
-  const [selectedGameToView, setSelectedGameToView] = useState<Game | null>(null);
-  const [gameAchievements, setGameAchievements] = useState<GameAchievement[]>([]);
-  const [isFetchingAchievements, setIsFetchingAchievements] = useState(false);
-  const [achievementSortDesc, setAchievementSortDesc] = useState(true); // Default: Common to Rare (70% -> 1%)
-  const [rareAchievementsCount, setRareAchievementsCount] = useState(0);
-
-  // Prevent background scrolling when any modal is open
-  useEffect(() => {
-    const isAnyModalOpen = !!selectedGameToView || showUpdatePlaytimeModal || isEditing || showStatsModal || showLogin || showAddModal || showOverwriteWarning;
-    if (isAnyModalOpen) {
-      document.body.style.overflow = "hidden";
-    } else {
-      document.body.style.overflow = "unset";
-    }
-    return () => { document.body.style.overflow = "unset"; };
-  }, [selectedGameToView, showUpdatePlaytimeModal, isEditing, showStatsModal, showLogin, showAddModal, showOverwriteWarning]);
+  const [showLogin, setShowLogin] = useState(false)
+  const [showAddModal, setShowAddModal] = useState(false)
+  const [showStatsModal, setShowStatsModal] = useState(false)
+  const [isBatchMode, setIsBatchMode] = useState(false)
+  const [selectedSteamIds, setSelectedSteamIds] = useState<string[]>([])
+  const [showUpdatePlaytimeModal, setShowUpdatePlaytimeModal] = useState(false)
+  const [playtimeUpdates, setPlaytimeUpdates] = useState<PlaytimeUpdate[]>([])
+  const [isUpdatingBulk, setIsUpdatingBulk] = useState(false)
+  const [searchTerm, setSearchTerm] = useState("")
+  const [sortType, setSortType] = useState("last_added")
+  const [selectedGameToView, setSelectedGameToView] = useState<Game | null>(null)
+const [gameToEdit, setGameToEdit] = useState<Game | null>(null)
 
   useEffect(() => {
-    fetchGames();
-    if (token) setIsLoggedIn(true);
-  }, [token]);
+    fetchGames()
+  }, [fetchGames])
 
-  const fetchGames = async () => {
+  useEffect(() => {
+    document.body.style.overflow = selectedGameToView || showUpdatePlaytimeModal || showAddModal || showStatsModal || showLogin ? "hidden" : "unset"
+    return () => { document.body.style.overflow = "unset" }
+  }, [selectedGameToView, showUpdatePlaytimeModal, showAddModal, showStatsModal, showLogin])
+
+  const handleLogin = useCallback(async (username: string, password: string) => {
+    await login(username, password)
+    toast.success("Logged in successfully")
+  }, [login])
+
+  const handleLogout = useCallback(() => {
+    logout()
+    setIsBatchMode(false)
+    setSelectedSteamIds([])
+    toast.info("Logged out")
+  }, [logout])
+
+  const handleDeleteGame = useCallback(async (steamId: string) => {
+    if (!token) return
     try {
-      const res = await axios.get(`${API_BASE}/games`);
-      setGames(res.data);
-    } catch (err) {
-      console.error("Error fetching games", err);
+      await deleteGame(steamId, token)
+      fetchGames()
+      toast.success("Game deleted")
+    } catch {
+      toast.error("Failed to delete game")
     }
-  };
+  }, [token, deleteGame, fetchGames])
 
-  const handleLogin = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleBulkDelete = useCallback(async () => {
+    if (!token || selectedSteamIds.length === 0) return
     try {
-      const res = await axios.post(`${API_BASE}/login`, { username, password });
-      const newToken = res.data.accessToken;
-      setToken(newToken);
-      localStorage.setItem("token", newToken);
-      setIsLoggedIn(true);
-      setShowLogin(false);
-    } catch (err) {
-      alert("Invalid credentials");
+      await bulkDelete(selectedSteamIds, token)
+      setSelectedSteamIds([])
+      setIsBatchMode(false)
+      fetchGames()
+      toast.success(`${selectedSteamIds.length} games deleted`)
+    } catch {
+      toast.error("Failed to bulk delete")
     }
-  };
+  }, [token, selectedSteamIds, bulkDelete, fetchGames])
 
-  const handleLogout = () => {
-    setToken(null);
-    localStorage.removeItem("token");
-    setIsLoggedIn(false);
-    setIsBatchMode(false);
-    setSelectedSteamIds([]);
-  };
-
-  const handleFetchGameInfo = async () => {
-    if (!newSteamId) return;
-
-    const exists = games.find((g) => g.steam_id === newSteamId);
-    if (exists) {
-      handleEditClick(exists);
-      return;
-    }
-
-    setIsFetching(true);
+  const handleFetchPlaytimeUpdates = useCallback(async () => {
+    if (!token) return
+    setIsUpdatingBulk(true)
     try {
-      const res = await axios.get(`${API_BASE}/steam/game/${newSteamId}`);
-      const gameData = {
-        ...res.data,
-        playtime_hours: 0,
-        playtime_minutes: 0,
-      };
-
-      setFetchedGame(gameData);
-      setShowOverwriteWarning(false);
-    } catch (err: any) {
-      alert(err.response?.data?.error || "Failed to fetch game data");
-    } finally {
-      setIsFetching(false);
-    }
-  };
-
-  const handleAddGame = async () => {
-    if (!fetchedGame || !token) return;
-    try {
-      const gameData = {
-        ...fetchedGame,
-        playtime_hours: playtimeHours,
-        playtime_minutes: playtimeMinutes,
-        // If playtime matches Steam playtime, mark it as a Steam import
-        is_steam_playtime: fetchedGame.steam_playtime &&
-          playtimeHours === fetchedGame.steam_playtime.hours &&
-          playtimeMinutes === fetchedGame.steam_playtime.minutes ? 1 : 0
-      };
-      await axios.post(`${API_BASE}/games`, gameData, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      closeModals();
-      fetchGames();
-    } catch (err) {
-      alert("Failed to add/update game");
-    }
-  };
-
-  const handleDeleteGame = async (steamId: string) => {
-    if (!token) return;
-    if (!window.confirm("Are you sure you want to delete this game?")) return;
-
-    try {
-      await axios.delete(`${API_BASE}/games/${steamId}`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      fetchGames();
-    } catch (err) {
-      alert("Failed to delete game");
-    }
-  };
-
-  const handleBulkDelete = async () => {
-    if (!token || selectedSteamIds.length === 0) return;
-    if (
-      !window.confirm(
-        `Are you sure you want to delete ${selectedSteamIds.length} games?`,
-      )
-    )
-      return;
-
-    try {
-      await axios.post(
-        `${API_BASE}/games/bulk-delete`,
-        { steam_ids: selectedSteamIds },
-        {
-          headers: { Authorization: `Bearer ${token}` },
-        },
-      );
-      setSelectedSteamIds([]);
-      setIsBatchMode(false);
-      fetchGames();
-    } catch (err) {
-      alert("Failed to bulk delete games");
-    }
-  };
-
-  const fetchPlaytimeUpdates = async () => {
-    if (!token) return;
-    setIsUpdatingBulk(true);
-    try {
-      const res = await axios.get(`${API_BASE}/steam/playtimes`);
-      const steamPlaytimes = res.data;
-
-      const updatesList: PlaytimeUpdate[] = [];
-
-      games.forEach(game => {
+      const steamPlaytimes = await fetchSteamPlaytimes()
+      const updatesList: PlaytimeUpdate[] = []
+      games.forEach((game) => {
         if (game.is_steam_playtime === 1) {
-          const fetched = steamPlaytimes[game.steam_id];
-          if (fetched) {
-            // Compare playtimes
-            if (game.playtime_hours !== fetched.hours || game.playtime_minutes !== fetched.minutes) {
-              updatesList.push({
-                steam_id: game.steam_id,
-                name: game.name,
-                currentHours: game.playtime_hours,
-                currentMinutes: game.playtime_minutes,
-                newHours: fetched.hours,
-                newMinutes: fetched.minutes,
-                selected: true // By default all are selected
-              });
-            }
+          const fetched = steamPlaytimes[game.steam_id]
+          if (fetched && (game.playtime_hours !== fetched.hours || game.playtime_minutes !== fetched.minutes)) {
+            updatesList.push({
+              steam_id: game.steam_id,
+              name: game.name,
+              currentHours: game.playtime_hours,
+              currentMinutes: game.playtime_minutes,
+              newHours: fetched.hours,
+              newMinutes: fetched.minutes,
+              selected: true,
+            })
           }
         }
-      });
-
-      setPlaytimeUpdates(updatesList);
-      setShowUpdatePlaytimeModal(true);
-    } catch (err) {
-      alert("Failed to fetch steam playtimes");
+      })
+      setPlaytimeUpdates(updatesList)
+      setShowUpdatePlaytimeModal(true)
+    } catch {
+      toast.error("Failed to fetch Steam playtimes")
     } finally {
-      setIsUpdatingBulk(false);
+      setIsUpdatingBulk(false)
     }
-  };
+  }, [token, games, fetchSteamPlaytimes])
 
-  const handleBulkPlaytimeUpdate = async () => {
-    const selectedUpdates = playtimeUpdates
-      .filter(u => u.selected)
-      .map(u => ({
-        steam_id: u.steam_id,
-        playtime_hours: u.newHours,
-        playtime_minutes: u.newMinutes
-      }));
-
-    if (selectedUpdates.length === 0) {
-      setShowUpdatePlaytimeModal(false);
-      return;
+  const handleBulkPlaytimeUpdate = useCallback(async () => {
+    const selected = playtimeUpdates.filter((u) => u.selected).map((u) => ({
+      steam_id: u.steam_id,
+      playtime_hours: u.newHours,
+      playtime_minutes: u.newMinutes,
+    }))
+    if (selected.length === 0) {
+      setShowUpdatePlaytimeModal(false)
+      return
     }
-
     try {
-      await axios.put(`${API_BASE}/games/bulk-update-playtime`, { updates: selectedUpdates }, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      setShowUpdatePlaytimeModal(false);
-      fetchGames();
-    } catch (err) {
-      alert("Failed to bulk update playtimes");
+      await bulkUpdatePlaytimes(selected, token!)
+      setShowUpdatePlaytimeModal(false)
+      fetchGames()
+      toast.success("Playtimes updated")
+    } catch {
+      toast.error("Failed to bulk update playtimes")
     }
-  };
+  }, [playtimeUpdates, bulkUpdatePlaytimes, token, fetchGames])
 
-  const toggleUpdateSelection = (steam_id: string) => {
-    setPlaytimeUpdates(prev => prev.map(u =>
-      u.steam_id === steam_id ? { ...u, selected: !u.selected } : u
-    ));
-  };
-
-  const handleGameClick = async (game: Game) => {
-    setSelectedGameToView(game);
-    setGameAchievements([]);
-    setIsFetchingAchievements(true);
+  const handleSyncAchievements = useCallback(async () => {
+    if (!token) return
     try {
-      const res = await axios.get(`${API_BASE}/games/${game.steam_id}/achievements`);
-      setGameAchievements(res.data);
-    } catch (err) {
-      console.error("Failed to fetch achievements", err);
-    } finally {
-      setIsFetchingAchievements(false);
+      const msg = await syncAchievements(token)
+      toast.success(msg)
+    } catch {
+      toast.error("Failed to sync achievements")
     }
-  };
+  }, [token, syncAchievements])
 
-  const handleSyncAchievements = async () => {
-    if (!token) return;
-    if (!window.confirm("Sync all existing games on the backend to grab achievements? This will run in the background.")) return;
-    try {
-      const res = await axios.post(`${API_BASE}/games/sync-achievements`, {}, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      alert(res.data.message);
-    } catch (err) {
-      alert("Failed to start sync");
-    }
-  };
-
-  const handleEditClick = (game: Game) => {
-    setFetchedGame(game);
-    setNewSteamId(game.steam_id);
-    setPlaytimeHours(game.playtime_hours);
-    setPlaytimeMinutes(game.playtime_minutes);
-    setIsEditing(true);
-    setShowAddModal(true);
-  };
-
-  const updatePlaytime = async () => {
-    if (!fetchedGame) return;
-    setIsFetching(true);
-    try {
-      const res = await axios.get(`${API_BASE}/steam/game/${fetchedGame.steam_id}`);
-      if (res.data.steam_playtime) {
-        setPlaytimeHours(res.data.steam_playtime.hours);
-        setPlaytimeMinutes(res.data.steam_playtime.minutes);
-        setFetchedGame({
-          ...fetchedGame,
-          steam_playtime: res.data.steam_playtime
-        });
-      } else {
-        alert("No Steam playtime found for this game.");
-      }
-    } catch (err) {
-      alert("Failed to fetch updated playtime from Steam.");
-    } finally {
-      setIsFetching(false);
-    }
-  };
-
-  const toggleGameSelection = (steamId: string) => {
-    if (!isBatchMode) return;
+  const toggleGameSelection = useCallback((steamId: string) => {
     setSelectedSteamIds((prev) =>
-      prev.includes(steamId)
-        ? prev.filter((id) => id !== steamId)
-        : [...prev, steamId],
-    );
-  };
+      prev.includes(steamId) ? prev.filter((id) => id !== steamId) : [...prev, steamId],
+    )
+  }, [])
 
-  const closeModals = () => {
-    setShowAddModal(false);
-    setFetchedGame(null);
-    setNewSteamId("");
-    setPlaytimeHours(0);
-    setPlaytimeMinutes(0);
-    setIsEditing(false);
-    setShowOverwriteWarning(false);
-    setShowStatsModal(false);
-    setShowUpdatePlaytimeModal(false);
-  };
+  const toggleUpdateSelection = useCallback((steamId: string) => {
+    setPlaytimeUpdates((prev) =>
+      prev.map((u) => (u.steam_id === steamId ? { ...u, selected: !u.selected } : u)),
+    )
+  }, [])
 
-  const handleShowStats = async () => {
-    setShowStatsModal(true);
-    try {
-      const res = await axios.get(`${API_BASE}/stats`);
-      setRareAchievementsCount(res.data.rareAchievements);
-    } catch (err) {
-      console.error("Failed to fetch stats", err);
-    }
-  };
+  const filteredGames = games.filter(
+    (g) => g.name.toLowerCase().includes(searchTerm.toLowerCase()) || g.steam_id.includes(searchTerm),
+  )
 
-  const calculateStats = () => {
-    const totalAchievements = games.reduce(
-      (acc, game) => acc + game.achievement_count,
-      0,
-    );
-    const totalMinutes = games.reduce(
-      (acc, game) => acc + game.playtime_hours * 60 + game.playtime_minutes,
-      0,
-    );
-    const totalHours = Math.floor(totalMinutes / 60);
-    const finalMinutes = totalMinutes % 60;
+  const displayedGames = [...filteredGames]
+  if (sortType === "first_added") {
+    displayedGames.reverse()
+  } else if (sortType !== "last_added") {
+    displayedGames.sort((a, b) => {
+      if (sortType === "most_achievements") return b.achievement_count - a.achievement_count
+      if (sortType === "least_achievements") return a.achievement_count - b.achievement_count
+      const pa = a.playtime_hours * 60 + a.playtime_minutes
+      const pb = b.playtime_hours * 60 + b.playtime_minutes
+      if (sortType === "most_playtime") return pb - pa
+      if (sortType === "least_playtime") return pa - pb
+      return 0
+    })
+  }
 
+  const stats = (() => {
+    const totalAchievements = games.reduce((acc, g) => acc + g.achievement_count, 0)
+    const totalMinutes = games.reduce((acc, g) => acc + g.playtime_hours * 60 + g.playtime_minutes, 0)
     return {
       totalGames: games.length,
       totalAchievements,
-      playtime: `${totalHours}h ${finalMinutes}m`,
-      // Count as perfect if achievements match total OR if there are 0 achievements
-      perfectGames: games.filter(
-        (g) => g.achievement_count === g.total_achievements || g.total_achievements === 0
-      ).length,
-    };
-  };
-
-  const stats = calculateStats();
-
-  // Helper to determine if a game is completed
-  const isCompleted = (game: Game) => {
-    return (
-      game.achievement_count === game.total_achievements ||
-      game.total_achievements === 0
-    );
-  };
-
-  const filteredGames = games.filter(
-    (game) =>
-      game.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      game.steam_id.includes(searchTerm),
-  );
-
-  const displayedGames = [...filteredGames];
-  if (sortType === "first_added") {
-    displayedGames.reverse();
-  } else if (sortType !== "last_added") {
-    displayedGames.sort((a, b) => {
-      if (sortType === "most_achievements") return b.achievement_count - a.achievement_count;
-      if (sortType === "least_achievements") return a.achievement_count - b.achievement_count;
-
-      const playtimeA = (a.playtime_hours * 60) + a.playtime_minutes;
-      const playtimeB = (b.playtime_hours * 60) + b.playtime_minutes;
-      if (sortType === "most_playtime") return playtimeB - playtimeA;
-      if (sortType === "least_playtime") return playtimeA - playtimeB;
-
-      return 0;
-    });
-  }
+      playtime: `${Math.floor(totalMinutes / 60)}h ${totalMinutes % 60}m`,
+      perfectGames: games.filter((g) => g.achievement_count === g.total_achievements || g.total_achievements === 0).length,
+    }
+  })()
 
   return (
-    <div className="container">
-      <header>
-        <div className="user-profile">
-          <div
-            className="avatar-placeholder"
-            onClick={handleShowStats}
-            style={{ cursor: 'pointer' }}
-            title="View Stats"
-          >
-            <img src={avatarImg} alt="***REMOVED***" />
-          </div>
-          <span className="user-name">
-            ***REMOVED***
-            {isLoggedIn && (
-              <button
-                className={`edit-mode-btn ${isBatchMode ? "active" : ""}`}
-                onClick={() => {
-                  setIsBatchMode(!isBatchMode);
-                  setSelectedSteamIds([]);
-                }}
-                title="Toggle Batch Edit Mode"
-              >
-                ✏️
-              </button>
-            )}
-          </span>
-        </div>
+    <div className="bg-background bg-[radial-gradient(circle_at_50%_-20%,rgba(255,62,62,0.15),transparent_60%),radial-gradient(circle_at_0%_0%,rgba(255,62,62,0.03),transparent_40%),radial-gradient(circle_at_100%_100%,rgba(255,62,62,0.03),transparent_40%),linear-gradient(180deg,#0f1722_0%,#070a0f_100%)] bg-fixed text-foreground font-sans min-h-screen">
+      <Toaster position="bottom-right" theme="dark" richColors closeButton />
 
-        <div className="stats-total">
-          <div style={{ display: "flex", gap: "10px", alignItems: "center" }}>
-            <div className="search-container">
-              <input
-                type="text"
-                placeholder="Search games..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="search-input"
+      <div className="mx-auto max-w-[1600px] px-5">
+        <Header
+          isLoggedIn={isLoggedIn}
+          isBatchMode={isBatchMode}
+          searchTerm={searchTerm}
+          sortType={sortType}
+          gamesCount={games.length}
+          filteredCount={filteredGames.length}
+          selectedCount={selectedSteamIds.length}
+          isUpdatingBulk={isUpdatingBulk}
+          onSearchChange={setSearchTerm}
+          onSortChange={setSortType}
+          onLoginClick={() => setShowLogin(true)}
+          onLogout={handleLogout}
+          onAddGameClick={() => setShowAddModal(true)}
+          onStatsClick={() => { fetchRareCount(); setShowStatsModal(true) }}
+          onToggleBatchMode={() => { setIsBatchMode(!isBatchMode); setSelectedSteamIds([]) }}
+          onFetchPlaytimeUpdates={handleFetchPlaytimeUpdates}
+          onSyncAchievements={handleSyncAchievements}
+          onBulkDelete={handleBulkDelete}
+        />
+
+        {loading && games.length === 0 ? (
+          <div className="flex justify-center py-20">
+            <div className="flex items-center gap-3 text-lg text-[#8f98a0]">
+              <div className="h-6 w-6 animate-spin rounded-full border-2 border-[#ff3e3e] border-t-transparent" />
+              Loading games...
+            </div>
+          </div>
+        ) : displayedGames.length > 0 ? (
+          <div className="flex flex-wrap justify-center gap-5 py-5">
+            {displayedGames.map((game) => (
+              <GameCard
+                key={game.steam_id}
+                game={game}
+                isBatchMode={isBatchMode}
+                isSelected={selectedSteamIds.includes(game.steam_id)}
+                onToggleSelect={toggleGameSelection}
+                onClick={(g) => setSelectedGameToView(g)}
               />
-              {searchTerm && (
-                <button
-                  className="clear-search"
-                  onClick={() => setSearchTerm("")}
-                >
-                  ✕
-                </button>
-              )}
-            </div>
-            <select
-              className="sort-dropdown"
-              value={sortType}
-              onChange={(e) => setSortType(e.target.value)}
-              title="Sort Games"
-            >
-              <option value="last_added">Last Added</option>
-              <option value="first_added">First Added</option>
-              <option value="most_playtime">Most Playtime</option>
-              <option value="least_playtime">Least Playtime</option>
-              <option value="most_achievements">Most Achievements</option>
-              <option value="least_achievements">Least Achievements</option>
-            </select>
+            ))}
           </div>
-          <div className="total-games-text">
-            TOTAL COMPLETED GAMES: {games.length}
-            {searchTerm && (
-              <span className="found-count">(Found: {filteredGames.length})</span>
-            )}
-            {games.length > 0 && (
-              <span
-                className="stats-star"
-                onClick={handleShowStats}
-                title="View more stats"
-                style={{ marginLeft: "10px" }}
-              >
-                ⭐
-              </span>
-            )}
-          </div>
-          {isBatchMode && (
-            <div className="batch-actions" style={{ flexDirection: 'row', gap: '10px' }}>
+        ) : (
+          <div className="flex flex-col items-center justify-center gap-4 py-20 text-[#8f98a0]">
+            <p className="text-lg">{searchTerm ? "No games match your search." : "No games yet."}</p>
+            {!searchTerm && isLoggedIn && (
               <button
-                className="delete-batch-btn"
-                style={{ backgroundColor: '#2a475e', minWidth: 'auto', marginBottom: '0' }}
-                onClick={fetchPlaytimeUpdates}
-                disabled={isUpdatingBulk}
+                onClick={() => setShowAddModal(true)}
+                className="rounded-md bg-[#ff3e3e] px-4 py-2 text-white transition-colors hover:bg-[#ff3e3e]/80"
               >
-                {isUpdatingBulk ? "FETCHING..." : "UPDATE PLAYTIMES OVERVIEW"}
+                + Add your first game
               </button>
-              <button
-                className="delete-batch-btn"
-                style={{ backgroundColor: '#2a475e', minWidth: 'auto', marginBottom: '0' }}
-                onClick={handleSyncAchievements}
-              >
-                SYNC ACHIEVEMENTS
-              </button>
-              {selectedSteamIds.length > 0 && (
-                <button className="delete-batch-btn" style={{ minWidth: 'auto', marginTop: '0', marginBottom: '0' }} onClick={handleBulkDelete}>
-                  DELETE SELECTED ({selectedSteamIds.length})
-                </button>
-              )}
-            </div>
-          )}
-        </div>
-
-        <div className="header-actions">
-          {!isLoggedIn ? (
-            <button className="login-btn" onClick={() => setShowLogin(true)}>
-              SIGN IN
-            </button>
-          ) : (
-            <>
-              <button onClick={() => setShowAddModal(true)}>+ ADD GAME</button>
-              <button className="login-btn" onClick={handleLogout}>
-                LOGOUT
-              </button>
-            </>
-          )}
-        </div>
-      </header>
-
-      <div className="game-grid">
-        {displayedGames.map((game) => (
-          <div
-            key={game.steam_id}
-            className={`game-card 
-              ${isCompleted(game) ? "completed" : ""} 
-              ${isBatchMode ? "batch-mode" : ""} 
-              ${selectedSteamIds.includes(game.steam_id) ? "selected" : ""}`}
-            onClick={() => isBatchMode ? toggleGameSelection(game.steam_id) : handleGameClick(game)}
-            style={{ cursor: "pointer" }}
-          >
-            <div className="game-image">
-              <img
-                src={game.image_url}
-                alt={game.name}
-                style={{ width: "100%", display: "block" }}
-              />
-            </div>
-            {isCompleted(game) && (
-              <div className="medal-icon">🎖️</div>
             )}
-            <div className="game-info">
-              <div className="game-name" title={game.name}>
-                {game.name}
-              </div>
-              <div className="game-details">
-                <div>ID: {game.steam_id}</div>
-                <div className="game-stats-row">
-                  {game.total_achievements > 0 ? (
-                    <div className="stat-group">
-                      🏆 {game.achievement_count} / {game.total_achievements}
-                    </div>
-                  ) : (
-                    <div></div> /* Spacer to keep playtime on the right */
-                  )}
-                  <div className="stat-group">
-                    🕒 {game.playtime_hours}h {game.playtime_minutes}m
-                  </div>
-                </div>
-              </div>
-            </div>
           </div>
-        ))}
+        )}
       </div>
 
-      {/* Login Modal */}
-      {showLogin && (
-        <div className="modal-overlay">
-          <div className="modal-content">
-            <h2>Sign In</h2>
-            <form onSubmit={handleLogin}>
-              <div className="form-group">
-                <label>Username</label>
-                <input
-                  type="text"
-                  value={username}
-                  onChange={(e) => setUsername(e.target.value)}
-                  required
-                />
-              </div>
-              <div className="form-group">
-                <label>Password</label>
-                <input
-                  type="password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  required
-                />
-              </div>
-              <div className="modal-actions">
-                <button
-                  type="button"
-                  onClick={() => setShowLogin(false)}
-                  style={{ background: "#4e5b6b" }}
-                >
-                  Cancel
-                </button>
-                <button type="submit">Login</button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-
-      {/* Detailed Stats Modal */}
-      {showStatsModal && (
-        <div className="modal-overlay" onClick={closeModals}>
-          <div className="modal-content" onClick={(e) => e.stopPropagation()}>
-            <h2 style={{ textAlign: "center", marginBottom: "20px" }}>
-              Player Statistics Overview
-            </h2>
-            <div className="stats-modal-grid">
-              <div className="stat-item">
-                <span className="stat-value">{stats.totalGames}</span>
-                <span className="stat-label">Total Games</span>
-              </div>
-              <div className="stat-item">
-                <span className="stat-value">{rareAchievementsCount}</span>
-                <span className="stat-label">Rare Achievements</span>
-              </div>
-              <div className="stat-item">
-                <span className="stat-value">{stats.totalAchievements}</span>
-                <span className="stat-label">Total Achievements</span>
-              </div>
-              <div className="stat-item">
-                <span className="stat-value">{stats.playtime}</span>
-                <span className="stat-label">Total Playtime</span>
-              </div>
-            </div>
-            <div
-              className="modal-actions"
-              style={{ marginTop: "30px", justifyContent: "center" }}
-            >
-              <button onClick={() => setShowStatsModal(false)}>Close Overview</button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Add/Edit Game Modal */}
-      {showAddModal && (
-        <div className="modal-overlay">
-          <div className="modal-content">
-            <h2>{isEditing ? "Edit Game" : "Add Game"}</h2>
-            {!isEditing && (
-              <div className="form-group">
-                <label>Steam ID</label>
-                <div style={{ display: "flex", gap: "5px" }}>
-                  <input
-                    type="text"
-                    value={newSteamId}
-                    onChange={(e) => setNewSteamId(e.target.value)}
-                    placeholder="e.g. 400"
-                  />
-                  <button onClick={handleFetchGameInfo} disabled={isFetching}>
-                    {isFetching ? "..." : "Fetch"}
-                  </button>
-                </div>
-              </div>
-            )}
-
-            {fetchedGame && (
-              <div
-                style={{
-                  marginTop: "15px",
-                  padding: "10px",
-                  background: "#101923",
-                }}
-              >
-                {showOverwriteWarning && (
-                  <div className="warning-text">
-                    ⚠️ This game is already in your list! Saving will overwrite
-                    it.
-                  </div>
-                )}
-                <div style={{ fontWeight: "bold" }}>{fetchedGame.name}</div>
-                {isEditing && fetchedGame.is_steam_playtime === 1 && (
-                  <div style={{ marginTop: "10px" }}>
-                    <button
-                      onClick={updatePlaytime}
-                      disabled={isFetching}
-                      style={{ background: "#2a475e", fontSize: "0.8rem" }}
-                    >
-                      {isFetching ? "Updating..." : "🔄 Update Playtime from Steam"}
-                    </button>
-                  </div>
-                )}
-                {fetchedGame.total_achievements > 0 && (
-                  <div>
-                    Achievements: {fetchedGame.achievement_count} /{" "}
-                    {fetchedGame.total_achievements}
-                  </div>
-                )}
-
-                {fetchedGame.steam_playtime && (
-                  <div
-                    style={{
-                      marginTop: "10px",
-                      padding: "8px",
-                      border: "1px dashed var(--accent-color)",
-                      borderRadius: "4px",
-                    }}
-                  >
-                    <div style={{ fontSize: "0.9rem", marginBottom: "5px" }}>
-                      🕒 Steam Playtime found:{" "}
-                      <b>
-                        {fetchedGame.steam_playtime.hours}h{" "}
-                        {fetchedGame.steam_playtime.minutes}m
-                      </b>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setPlaytimeHours(fetchedGame.steam_playtime!.hours);
-                        setPlaytimeMinutes(fetchedGame.steam_playtime!.minutes);
-                      }}
-                      style={{ fontSize: "0.75rem", padding: "4px 8px" }}
-                    >
-                      Import Playtime
-                    </button>
-                  </div>
-                )}
-
-                <div className="form-group" style={{ marginTop: "10px" }}>
-                  <label>Playtime Hours</label>
-                  <input
-                    type="number"
-                    value={playtimeHours}
-                    onChange={
-                      setPlaytimeHours
-                        ? (e) => setPlaytimeHours(parseInt(e.target.value) || 0)
-                        : undefined
-                    }
-                  />
-                </div>
-                <div className="form-group">
-                  <label>Playtime Minutes</label>
-                  <input
-                    type="number"
-                    value={playtimeMinutes}
-                    onChange={
-                      setPlaytimeMinutes
-                        ? (e) =>
-                          setPlaytimeMinutes(parseInt(e.target.value) || 0)
-                        : undefined
-                    }
-                  />
-                </div>
-
-                <div className="modal-actions">
-                  <button
-                    onClick={closeModals}
-                    style={{ background: "#4e5b6b" }}
-                  >
-                    Cancel
-                  </button>
-                  <button onClick={handleAddGame}>
-                    {isEditing || showOverwriteWarning
-                      ? "Overwrite"
-                      : "Add to List"}
-                  </button>
-                </div>
-              </div>
-            )}
-
-            {!fetchedGame && (
-              <div className="modal-actions" style={{ marginTop: "20px" }}>
-                <button onClick={closeModals} style={{ background: "#4e5b6b" }}>
-                  Close
-                </button>
-              </div>
-            )}
-          </div>
-        </div>
-      )}
-
-      {/* Bulk Playtime Update Modal */}
-      {showUpdatePlaytimeModal && (
-        <div className="modal-overlay" onClick={() => setShowUpdatePlaytimeModal(false)}>
-          <div className="modal-content" style={{ maxWidth: '600px', maxHeight: '80vh', overflowY: 'auto' }} onClick={(e) => e.stopPropagation()}>
-            <h2 style={{ textAlign: "center", marginBottom: "20px" }}>Playtime Updates Overview</h2>
-
-            {playtimeUpdates.length === 0 ? (
-              <p style={{ textAlign: "center", color: "#8f98a0" }}>All your Steam games are already up to date!</p>
-            ) : (
-              <div className="update-list">
-                {playtimeUpdates.map(update => (
-                  <div key={update.steam_id} className="update-item" onClick={() => toggleUpdateSelection(update.steam_id)}>
-                    <input
-                      type="checkbox"
-                      checked={update.selected}
-                      readOnly
-                      style={{ cursor: "pointer", marginRight: "15px" }}
-                    />
-                    <div className="update-info">
-                      <div style={{ fontWeight: "bold", marginBottom: "4px" }}>{update.name}</div>
-                      <div className="diff-text">
-                        <span>{update.currentHours}h {update.currentMinutes}m</span>
-                        <span style={{ margin: "0 10px", color: "var(--accent-color)" }}>→</span>
-                        <span style={{ color: "white" }}>{update.newHours}h {update.newMinutes}m</span>
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-
-            <div className="modal-actions" style={{ marginTop: "30px", justifyContent: "flex-end", position: "sticky", bottom: "0", background: "var(--card-bg)" }}>
-              <button
-                style={{ background: "#4e5b6b" }}
-                onClick={() => setShowUpdatePlaytimeModal(false)}
-              >
-                Cancel
-              </button>
-              {playtimeUpdates.length > 0 && (
-                <button onClick={handleBulkPlaytimeUpdate}>
-                  Confirm Selection
-                </button>
-              )}
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Game Details Modal */}
-      {selectedGameToView && (
-        <div className="modal-overlay" onClick={() => setSelectedGameToView(null)}>
-          <div className="modal-content details-modal" onClick={(e) => e.stopPropagation()}>
-            <div className="details-header" style={{ backgroundImage: `url(${selectedGameToView.image_url})` }}>
-              <div className="details-header-overlay">
-                <h2>{selectedGameToView.name}</h2>
-                <div className="details-playtime">
-                  🕒 {selectedGameToView.playtime_hours}h {selectedGameToView.playtime_minutes}m
-                </div>
-              </div>
-            </div>
-
-            {isLoggedIn && (
-              <div className="details-actions">
-                <button
-                  onClick={() => { setSelectedGameToView(null); handleEditClick(selectedGameToView); }}
-                  style={{ background: "#2a475e", flex: 1 }}
-                >
-                  ✏️ Edit Playtime
-                </button>
-                <button
-                  onClick={() => {
-                    handleDeleteGame(selectedGameToView.steam_id);
-                    setSelectedGameToView(null);
-                  }}
-                  style={{ background: "#ff3e3e", flex: 1 }}
-                >
-                  🗑️ Delete Game
-                </button>
-              </div>
-            )}
-
-            <div className="achievements-container">
-              <div className="achievements-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 20px', background: 'rgba(0,0,0,0.2)', borderBottom: '1px solid #1a2432' }}>
-                <span style={{ fontSize: '0.85rem', color: '#8f98a0', fontWeight: 'bold', textTransform: 'uppercase' }}>Achievements</span>
-                <button
-                  onClick={() => setAchievementSortDesc(!achievementSortDesc)}
-                  style={{ background: 'transparent', border: '1px solid #323e4c', fontSize: '0.75rem', padding: '4px 10px', borderRadius: '4px', color: '#8f98a0' }}
-                >
-                  Sort: {achievementSortDesc ? "Common ➔ Rare" : "Rare ➔ Common"}
-                </button>
-              </div>
-              {isFetchingAchievements ? (
-                <div style={{ textAlign: 'center', padding: '40px' }}>Loading achievements...</div>
-              ) : gameAchievements.length > 0 ? (
-                <div className="achievement-list">
-                  {[...gameAchievements]
-                    .sort((a, b) => achievementSortDesc ? b.rarity - a.rarity : a.rarity - b.rarity)
-                    .map(ach => (
-                      <div className="achievement-row" key={ach.api_name}>
-                        <img src={ach.icon_url} alt={ach.display_name} className="achievement-icon" />
-                        <div className="achievement-text">
-                          <div className="achievement-title">{ach.display_name}</div>
-                          <div className="achievement-desc">{ach.description}</div>
-                        </div>
-                        <div className="achievement-rarity">
-                          {ach.rarity.toFixed(1)}%
-                        </div>
-                      </div>
-                    ))}
-                </div>
-              ) : (
-                <div style={{ textAlign: 'center', padding: '40px', color: '#8f98a0' }}>
-                  No Steam Achievements available for this title.
-                </div>
-              )}
-            </div>
-
-            <div className="modal-actions" style={{ marginTop: '20px', justifyContent: 'center' }}>
-              <button onClick={() => setSelectedGameToView(null)} style={{ background: "#4e5b6b", width: '100%' }}>Close Details</button>
-            </div>
-          </div>
-        </div>
-      )}
+      <LoginModal open={showLogin} onOpenChange={setShowLogin} onLogin={handleLogin} />
+      <AddGameModal open={showAddModal} onOpenChange={(open) => { setShowAddModal(open); if (!open) setGameToEdit(null) }} games={games} token={token} onGameAdded={fetchGames} gameToEdit={gameToEdit} />
+      <StatsModal
+        open={showStatsModal}
+        onOpenChange={setShowStatsModal}
+        totalGames={stats.totalGames}
+        totalAchievements={stats.totalAchievements}
+        rareAchievements={rareCount}
+        totalPlaytime={stats.playtime}
+        perfectGames={stats.perfectGames}
+      />
+      <GameDetailsModal
+        game={selectedGameToView}
+        open={!!selectedGameToView}
+        onOpenChange={(open) => { if (!open) setSelectedGameToView(null) }}
+        onEdit={(game) => {
+          setSelectedGameToView(null)
+          setGameToEdit(game)
+          setShowAddModal(true)
+        }}
+        onDelete={handleDeleteGame}
+        token={token}
+      />
+      <BulkPlaytimeModal
+        open={showUpdatePlaytimeModal}
+        onOpenChange={setShowUpdatePlaytimeModal}
+        updates={playtimeUpdates}
+        onToggleUpdate={toggleUpdateSelection}
+        onConfirm={handleBulkPlaytimeUpdate}
+      />
     </div>
-  );
+  )
 }
 
-export default App;
+export default App
