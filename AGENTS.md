@@ -2,20 +2,15 @@
 
 ## Structure
 
-Monorepo with two packages: `backend/` (Express, CommonJS) and `frontend/` (React+Vite, ESM).
-The root `Dockerfile` builds both into a single production image.
+Monorepo with two packages: `backend/` (Express 5, CommonJS) and `frontend/` (React 19 + Vite 8, ESM).
+The root `Dockerfile` builds both into a single production image (`node:20-slim`).
 
 ## Quick start (dev)
 
 ```powershell
-# Terminal 1 — Backend on :5000
-cd backend
-cp .env.example .env        # edit with real values
-npm install && npm run dev  # nodemon with auto-restart
-
-# Terminal 2 — Frontend on :5173
-cd frontend
-npm install && npm run dev
+cd backend; cp .env.example .env  # fill with real secrets
+cd backend; npm install; npm run dev   # nodemon on :5000
+cd frontend; npm install; npm run dev  # Vite on :5173, proxies /api → :5000
 ```
 
 Or run `.\Run-Locally.ps1` to launch both in separate windows.
@@ -27,64 +22,74 @@ Or run `.\Run-Locally.ps1` to launch both in separate windows.
 | Backend dev | `cd backend && npm run dev` |
 | Backend prod | `cd backend && npm start` |
 | Frontend dev | `cd frontend && npm run dev` |
-| Frontend build | `cd frontend && npm run build` |
+| Frontend build | `cd frontend && npm run build` (runs `tsc -b && vite build`) |
 | Frontend lint | `cd frontend && npm run lint` |
-| Docker build & push | `.\Build-And-Push.ps1` (pushes as `mohandl3g/pc-achievements:latest`) |
-| Update deps | `.\Update-Dependencies.ps1` (runs `npm update + audit fix` in both) |
+| Backend test | `cd backend && npm test` (mocha — needs JWT_SECRET set) |
+| Frontend test | `cd frontend && npm test` (vitest) |
+| Docker build & push | `.\Build-And-Push.ps1` |
+| Update deps | `.\Update-Dependencies.ps1` |
 
 ## Environment
 
-Backend reads env vars via `dotenv` (`.env` file) or real env vars in prod/Docker.
-Required vars:
+Backend reads `.env` via `dotenv`. Missing `JWT_SECRET` or `ADMIN_PASSWORD` causes a fatal error at startup.
 
-- `STEAM_API_KEY` — Steam Web API key
-- `STEAM_USER_ID` — 64-bit Steam ID
-- `JWT_SECRET` — arbitrary secret
-- `ADMIN_USERNAME` — default `admin`
-- `ADMIN_PASSWORD` — **must be a bcrypt hash** (the code calls `bcrypt.compare` against it), not plaintext
-- `DATABASE_PATH` — optional, default `backend/achievements.db`
-- `PORT` — optional, default `5000`
+| Var | Required | Notes |
+|---|---|---|
+| `STEAM_API_KEY` | Yes | Steam Web API key |
+| `STEAM_USER_ID` | Yes | 64-bit Steam ID |
+| `JWT_SECRET` | Yes | JWT signing secret |
+| `ADMIN_PASSWORD` | Yes | **Bcrypt hash** (code uses `bcrypt.compare`) |
+| `ADMIN_USERNAME` | No | Default `admin` |
+| `DATABASE_PATH` | No | Default `backend/achievements.db` |
+| `PORT` | No | Default `5000` |
 
-The `.env.example` contains `ADMIN_PASSWORD=Ms@199903` (plaintext) — do **not** use it as-is; hash it first.
+Generate bcrypt hash: `node -e "console.log(require('bcryptjs').hashSync('your-password', 10))"`
 
 ## Architecture notes
 
-- Backend entrypoint: `backend/server.js` — single file with all routes, DB setup, Steam API calls
-- Frontend entrypoint: `frontend/src/main.tsx` renders `<App />` (single component in `App.tsx`)
-- Database: SQLite3, auto-creates `games` and `game_achievements` tables on startup
-- Auth: JWT with bcrypt login at `POST /api/login`, rate-limited (5 tries / 15 min)
-- CORS: allows `localhost:*`, `http://localhost:5173`, and configured production origins
-- Known issue: `vite.config.ts` does **not** configure a dev proxy, but README claims it does. In dev, frontend requests to `/api/*` resolve against `localhost:5173` and **will fail** unless you add `server.proxy` to `vite.config.ts`. The backend's CORS allows `localhost:5173` for direct requests (using absolute URLs) as a workaround.
-- Module systems: backend is CommonJS, frontend is ESM (`"type": "module"`)
+- **Backend entrypoint**: `backend/server.js` (routing only) → logic in `backend/src/` (`routes/`, `middleware/`, `services/`, `db.js`, `config.js`)
+- **Frontend entrypoint**: `frontend/src/main.tsx` → `<App />` orchestrated from `App.tsx` (~280 lines), with separate component, hook, and API files
+- **Database**: SQLite3 via `sqlite3`, auto-creates `games` and `game_achievements` tables on startup
+- **Validation**: Zod v4 schemas in `backend/src/middleware/validate.js` with middleware wrapper
+- **Auth**: JWT (HS256) with bcrypt login at `POST /api/login`, rate-limited (5 tries / 15 min)
+- **CORS**: Allows localhost origins + configured production domains (`backend/src/config.js`)
+- **CSP**: Configured in `server.js` via Helmet — allows `*.steamstatic.com` and `*.akamaihd.net` for images
+- **Vite proxy**: `vite.config.ts` DOES proxy `/api` → `localhost:5000` (contrary to what some docs may claim)
+- **Module systems**: backend = CommonJS, frontend = ESM (`"type": "module"`)
+- **Path alias**: Frontend uses `@/` → `src/` (configured in both `vite.config.ts` and `tsconfig.app.json`)
+- **Tailwind**: v4 with `@tailwindcss/vite` plugin (no PostCSS config needed)
+- **ESLint**: Flat config (`eslint.config.js`) with `typescript-eslint`, `react-hooks`, `react-refresh`
+- **No `.env` is committed** — it's in `.gitignore`
 
-## PowerShell automation scripts
+## PowerShell scripts
 
 | Script | What it does |
 |---|---|
 | `Run-Locally.ps1` | Starts backend + frontend in separate PowerShell windows |
-| `Build-And-Push.ps1` | `docker build` ➜ `docker push` ➜ cleanup |
+| `Build-And-Push.ps1` | `docker build` ➜ `docker push` ➜ cleanup history + builder cache |
 | `Update-Dependencies.ps1` | `npm update` + `npm audit fix` for both packages |
-| `Auto-Update-Deploy.ps1` | Updates deps, builds/pushes Docker image, and commits if updates found |
+| `Auto-Update-Deploy.ps1` | Runs Update → Build-And-Push → commits package.json changes |
 
 ## Testing
 
-No tests exist. `backend/package.json` has a placeholder test script; frontend has no test runner.
-
-## Frontend specifics
-
-- React 19, Vite 8, TypeScript ~5.9
-- TypeScript: strict mode, `noUnusedLocals`, `noUnusedParameters`, `verbatimModuleSyntax`
-- ESLint: `typescript-eslint/recommended`, `react-hooks`, `react-refresh`
-- All UI logic in a single `App.tsx` (modals, state, handlers, rendering — ~940 lines)
-- Build: `cd frontend && npm run build` (runs `tsc -b && vite build`)
+- **Backend** (Mocha + Chai + Supertest): `cd backend && npm test`. Existing tests: `auth.test.js`, `validate.test.js`.
+- **Frontend** (Vitest + Testing Library + jsdom): `cd frontend && npm test`. Existing tests: `utils.test.ts`, `Header.test.tsx`.
+- Vitest config is embedded in `vite.config.ts` (environment: jsdom, globals: true).
 
 ## Docker
 
-Production build uses root `Dockerfile` (multi-stage). Standalone Dockerfiles in `backend/Dockerfile` and `frontend/Dockerfile` are not used in the main pipeline.
+- Root `Dockerfile` (multi-stage):
+  1. `node:20-slim` builds frontend (`npm run build`)
+  2. `node:20-slim` compiles native `sqlite3` (`--build-from-source=sqlite3`) plus copies backend
+  3. Final stage runs as `node` user, serves built frontend from `./public`
+- Built frontend is served by Express via `express.static('public')` with SPA fallback at `*path`
+- Healthcheck: GET `/api/games` every 30s
+- Compose mounts `./database` volume for SQLite persistence + Caddy for HTTPS
+- Standalone Dockerfiles in `backend/Dockerfile` and `frontend/Dockerfile` exist but are unused
 
 ```powershell
 docker build -t pc-achievements .
-docker compose up -d         # uses image mohandl3g/pc-achievements:latest
+docker compose up -d
 ```
 
 ## Key API endpoints
@@ -98,7 +103,7 @@ docker compose up -d         # uses image mohandl3g/pc-achievements:latest
 | `POST /api/games/bulk-delete` | JWT | Bulk delete |
 | `PUT /api/games/:steam_id` | JWT | Update playtime only |
 | `PUT /api/games/bulk-update-playtime` | JWT | Bulk update playtimes |
-| `POST /api/games/sync-achievements` | JWT | Sync all achievements in background |
+| `POST /api/games/sync-achievements` | JWT | Sync all achievements (background) |
 | `GET /api/games/:steam_id/achievements` | No | Get achievements for a game |
 | `GET /api/steam/game/:steam_id` | No | Fetch game info from Steam |
 | `GET /api/steam/playtimes` | No | Bulk fetch Steam playtimes |

@@ -13,15 +13,15 @@ router.get('/game/:steam_id', async (req, res) => {
   }
 
   try {
-    let schemaRes;
+    let schemaData = { gameName: null, availableGameStats: { achievements: [] } };
     try {
-      schemaRes = await axios.get(`https://api.steampowered.com/ISteamUserStats/GetSchemaForGame/v2/?key=${apiKey}&appid=${steam_id}`);
+      const schemaRes = await axios.get(`https://api.steampowered.com/ISteamUserStats/GetSchemaForGame/v2/?key=${apiKey}&appid=${steam_id}`);
+      schemaData = schemaRes.data.game || schemaData;
     } catch (err) {
-      console.error('Steam Schema API Error:', err.response?.data || err.message);
-      return res.status(500).json({ error: 'Failed to fetch game schema from Steam. Is the Steam AppID correct?' });
+      console.warn('Steam Schema API error (proceeding without achievements):', err.message);
     }
 
-    let gameName = schemaRes.data.game?.gameName;
+    let gameName = schemaData.gameName;
     try {
       const storeRes = await axios.get(`https://store.steampowered.com/api/appdetails?appids=${steam_id}`);
       if (storeRes.data[steam_id]?.success) {
@@ -35,14 +35,26 @@ router.get('/game/:steam_id', async (req, res) => {
       return res.status(404).json({ error: 'Game not found on Steam' });
     }
 
-    const achievements = schemaRes.data.game?.availableGameStats?.achievements || [];
+    const achievements = schemaData.availableGameStats?.achievements || [];
     const totalAchievements = achievements.length;
 
     let steamPlaytime = null;
     if (apiKey && steamUserId && steamUserId !== 'YOUR_STEAM_ID_64_BIT') {
       try {
-        const playtimeRes = await axios.get(`https://api.steampowered.com/IPlayerService/GetOwnedGames/v1/?key=${apiKey}&steamid=${steamUserId}&format=json&appids_filter[0]=${steam_id}`);
-        const gameInfo = playtimeRes.data.response?.games?.[0];
+        const ownRes = await axios.get(`https://api.steampowered.com/IPlayerService/GetOwnedGames/v1/?key=${apiKey}&steamid=${steamUserId}&include_played_free_games=1`);
+        const ownGames = ownRes.data.response?.games || [];
+        let gameInfo = ownGames.find(g => String(g.appid) === steam_id);
+
+        if (!gameInfo) {
+          try {
+            const recentRes = await axios.get(`https://api.steampowered.com/IPlayerService/GetRecentlyPlayedGames/v1/?key=${apiKey}&steamid=${steamUserId}`);
+            const recentGames = recentRes.data.response?.games || [];
+            gameInfo = recentGames.find(g => String(g.appid) === steam_id);
+          } catch (e) {
+            console.warn('Steam RecentlyPlayed API Error:', e.message);
+          }
+        }
+
         if (gameInfo) {
           steamPlaytime = {
             hours: Math.floor(gameInfo.playtime_forever / 60),

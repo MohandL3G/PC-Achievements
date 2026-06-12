@@ -36,7 +36,12 @@ export function AddGameModal({ open, onOpenChange, games, token, onGameAdded, ga
     setIsFetching(true)
     try {
       const res = await api.get(`/steam/game/${newSteamId}`)
-      setFetchedGame({ ...res.data, playtime_hours: 0, playtime_minutes: 0 })
+      const { steam_playtime } = res.data
+      setFetchedGame({
+        ...res.data,
+        playtime_hours: steam_playtime?.hours ?? 0,
+        playtime_minutes: steam_playtime?.minutes ?? 0,
+      })
     } catch (err: unknown) {
       const axiosErr = err as { response?: { data?: { error?: string } } }
       alert(axiosErr.response?.data?.error || "Failed to fetch game data")
