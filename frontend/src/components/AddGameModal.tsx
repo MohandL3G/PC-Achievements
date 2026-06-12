@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { api } from "@/api/client"
 import type { Game } from "@/types"
-import { RefreshCw, Download } from "lucide-react"
+import { RefreshCw, Download, Clock } from "lucide-react"
 
 interface AddGameModalProps {
   open: boolean
@@ -21,12 +21,14 @@ export function AddGameModal({ open, onOpenChange, games, token, onGameAdded, ga
   const [playtimeHours, setPlaytimeHours] = useState(gameToEdit?.playtime_hours ?? 0)
   const [playtimeMinutes, setPlaytimeMinutes] = useState(gameToEdit?.playtime_minutes ?? 0)
   const [isFetching, setIsFetching] = useState(false)
-  const isEditing = !!gameToEdit || !!fetchedGame
+  const [decimalHours, setDecimalHours] = useState("")
+  const [playtimeMode, setPlaytimeMode] = useState<"hms" | "decimal">("hms")
+  const isEditing = !!gameToEdit
 
   const handleFetchGameInfo = async () => {
     if (!newSteamId) return
     const exists = games.find((g) => g.steam_id === newSteamId)
-    if (exists) {
+    if (exists && !fetchedGame) {
       setFetchedGame(exists)
       setPlaytimeHours(exists.playtime_hours)
       setPlaytimeMinutes(exists.playtime_minutes)
@@ -39,6 +41,7 @@ export function AddGameModal({ open, onOpenChange, games, token, onGameAdded, ga
       const { steam_playtime } = res.data
       setFetchedGame({
         ...res.data,
+        is_owned: 1,
         playtime_hours: steam_playtime?.hours ?? 0,
         playtime_minutes: steam_playtime?.minutes ?? 0,
       })
@@ -52,15 +55,22 @@ export function AddGameModal({ open, onOpenChange, games, token, onGameAdded, ga
 
   const handleAddGame = async () => {
     if (!fetchedGame || !token) return
+    let hours = playtimeHours
+    let minutes = playtimeMinutes
+    if (playtimeMode === "decimal") {
+      const dec = parseFloat(decimalHours) || 0
+      hours = Math.floor(dec)
+      minutes = Math.round((dec - hours) * 60)
+    }
     try {
       const gameData = {
         ...fetchedGame,
-        playtime_hours: playtimeHours,
-        playtime_minutes: playtimeMinutes,
+        playtime_hours: hours,
+        playtime_minutes: minutes,
         is_steam_playtime:
           fetchedGame.steam_playtime &&
-          playtimeHours === fetchedGame.steam_playtime.hours &&
-          playtimeMinutes === fetchedGame.steam_playtime.minutes
+          hours === fetchedGame.steam_playtime.hours &&
+          minutes === fetchedGame.steam_playtime.minutes
             ? 1
             : 0,
       }
@@ -79,6 +89,7 @@ export function AddGameModal({ open, onOpenChange, games, token, onGameAdded, ga
     setIsFetching(true)
     try {
       const res = await api.get(`/steam/game/${fetchedGame.steam_id}`)
+      setFetchedGame((prev) => prev ? { ...prev, is_owned: 1 } : prev)
       if (res.data.steam_playtime) {
         setPlaytimeHours(res.data.steam_playtime.hours)
         setPlaytimeMinutes(res.data.steam_playtime.minutes)
@@ -89,6 +100,19 @@ export function AddGameModal({ open, onOpenChange, games, token, onGameAdded, ga
       alert("Failed to fetch updated playtime from Steam.")
     } finally {
       setIsFetching(false)
+    }
+  }
+
+  const togglePlaytimeMode = () => {
+    if (playtimeMode === "hms") {
+      const total = playtimeHours + playtimeMinutes / 60
+      setDecimalHours(total > 0 ? total.toFixed(1) : "")
+      setPlaytimeMode("decimal")
+    } else {
+      const dec = parseFloat(decimalHours) || 0
+      setPlaytimeHours(Math.floor(dec))
+      setPlaytimeMinutes(Math.round((dec - Math.floor(dec)) * 60))
+      setPlaytimeMode("hms")
     }
   }
 
@@ -123,7 +147,7 @@ export function AddGameModal({ open, onOpenChange, games, token, onGameAdded, ga
             <div className="space-y-3 rounded-md bg-[#101923] p-2.5">
               <div className="font-bold">{fetchedGame.name}</div>
 
-              {isEditing && fetchedGame.is_steam_playtime === 1 && (
+              {isEditing && (
                 <Button onClick={updatePlaytimeFromSteam} disabled={isFetching} variant="secondary" className="w-full text-sm">
                   <RefreshCw className="mr-1 h-4 w-4" />
                   {isFetching ? "Updating..." : "Update Playtime from Steam"}
@@ -155,22 +179,49 @@ export function AddGameModal({ open, onOpenChange, games, token, onGameAdded, ga
                 </div>
               )}
 
-              <div className="space-y-2">
-                <label className="text-sm font-medium">Playtime Hours</label>
-                <Input
-                  type="number"
-                  value={playtimeHours}
-                  onChange={(e) => setPlaytimeHours(parseInt(e.target.value) || 0)}
-                />
+              <div className="flex items-center justify-between">
+                <label className="text-sm font-medium">Playtime</label>
+                <button
+                  type="button"
+                  onClick={togglePlaytimeMode}
+                  className="flex items-center gap-1 text-xs text-[#8f98a0] transition-colors hover:text-white"
+                >
+                  <Clock className="h-3 w-3" />
+                  {playtimeMode === "hms" ? "Switch to Decimal" : "Switch to Hours:Minutes"}
+                </button>
               </div>
-              <div className="space-y-2">
-                <label className="text-sm font-medium">Playtime Minutes</label>
-                <Input
-                  type="number"
-                  value={playtimeMinutes}
-                  onChange={(e) => setPlaytimeMinutes(parseInt(e.target.value) || 0)}
-                />
-              </div>
+
+              {playtimeMode === "hms" ? (
+                <div className="flex gap-2">
+                  <div className="flex-1 space-y-2">
+                    <label className="text-xs text-[#8f98a0]">Hours</label>
+                    <Input
+                      type="number"
+                      value={playtimeHours}
+                      onChange={(e) => setPlaytimeHours(parseInt(e.target.value) || 0)}
+                    />
+                  </div>
+                  <div className="flex-1 space-y-2">
+                    <label className="text-xs text-[#8f98a0]">Minutes</label>
+                    <Input
+                      type="number"
+                      value={playtimeMinutes}
+                      onChange={(e) => setPlaytimeMinutes(parseInt(e.target.value) || 0)}
+                    />
+                  </div>
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  <label className="text-xs text-[#8f98a0]">Decimal Hours</label>
+                  <Input
+                    type="number"
+                    step="0.1"
+                    value={decimalHours}
+                    onChange={(e) => setDecimalHours(e.target.value)}
+                    placeholder="e.g. 10.3"
+                  />
+                </div>
+              )}
 
               <div className="flex justify-end gap-2">
                 <Button variant="secondary" onClick={() => onOpenChange(false)}>

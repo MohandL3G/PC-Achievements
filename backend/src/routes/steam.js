@@ -91,8 +91,17 @@ router.get('/playtimes', async (req, res) => {
   }
 
   try {
-    const playtimeRes = await axios.get(`https://api.steampowered.com/IPlayerService/GetOwnedGames/v1/?key=${apiKey}&steamid=${steamUserId}&format=json`);
-    const games = playtimeRes.data.response?.games || [];
+    let playtimeRes;
+    try {
+      playtimeRes = await axios.get(`https://api.steampowered.com/IPlayerService/GetOwnedGames/v1/?key=${apiKey}&steamid=${steamUserId}&format=json&include_played_free_games=1`);
+    } catch {
+      playtimeRes = { data: { response: { games: [] } } };
+    }
+    let games = playtimeRes.data.response?.games || [];
+    if (games.length === 0) {
+      const recentRes = await axios.get(`https://api.steampowered.com/IPlayerService/GetRecentlyPlayedGames/v1/?key=${apiKey}&steamid=${steamUserId}&format=json`);
+      games = recentRes.data.response?.games || [];
+    }
 
     const playtimes = {};
     for (const g of games) {

@@ -51,6 +51,7 @@ export function GameCard({ game, isBatchMode, isSelected, onToggleSelect, onClic
         </div>
         <div className="space-y-1 text-xs text-[#8f98a0]">
           <div>ID: {game.steam_id}</div>
+          {game.date_added && <div>Added: {new Date(game.date_added).toLocaleDateString()}</div>}
           <div className="flex items-center justify-between gap-2">
             {game.total_achievements > 0 ? (
               <div className="flex items-center gap-1">

@@ -3,7 +3,6 @@ import { Dialog, DialogContent, DialogHeader } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Badge } from "@/components/ui/badge"
-import { ScrollArea } from "@/components/ui/scroll-area"
 import { api } from "@/api/client"
 import type { Game, GameAchievement } from "@/types"
 import { Clock, Pencil, Trash2, Trophy } from "lucide-react"
@@ -41,24 +40,29 @@ export function GameDetailsModal({ game, open, onOpenChange, onEdit, onDelete, t
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[650px] gap-0 p-0">
-        <div
-          className="relative flex h-[220px] items-end bg-cover bg-center"
-          style={{ backgroundImage: `url(${game.image_url})` }}
-        >
-          <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/40 to-transparent" />
-          <div className="relative z-10 p-5">
-            <DialogHeader>
-              <h2 className="text-2xl font-bold text-white">{game.name}</h2>
-            </DialogHeader>
-            <div className="flex items-center gap-1 text-white/80">
-              <Clock className="h-4 w-4" />
-              <span>
-                {game.playtime_hours}h {game.playtime_minutes}m
-              </span>
+      <DialogContent className="sm:max-w-[800px] gap-0 p-0 max-h-[85vh] overflow-y-auto overflow-x-hidden">
+          <div
+            className="flex h-[220px] items-end bg-cover bg-center"
+            style={{ backgroundImage: `url(${game.image_url})` }}
+          >
+            <div className="flex w-full flex-col justify-end bg-gradient-to-t from-black/80 via-black/40 to-transparent p-5">
+              <DialogHeader>
+                <h2 className="text-2xl font-bold text-white">{game.name}</h2>
+              </DialogHeader>
+              <div className="flex items-center gap-1 text-white/80">
+                <Clock className="h-4 w-4" />
+                <span>
+                  {game.playtime_hours}h {game.playtime_minutes}m
+                </span>
+                {game.date_added && (
+                  <>
+                    <span className="mx-1.5 text-white/40">|</span>
+                    <span>Added: {new Date(game.date_added).toLocaleDateString()}</span>
+                  </>
+                )}
+              </div>
             </div>
           </div>
-        </div>
 
         {token && (
           <div className="flex gap-2 border-b border-[#1a2432] p-3">
@@ -113,8 +117,7 @@ export function GameDetailsModal({ game, open, onOpenChange, onEdit, onDelete, t
             ))}
           </div>
         ) : sorted.length > 0 ? (
-          <ScrollArea className="max-h-[450px]">
-            <div className="space-y-0">
+          <div className="space-y-0">
               {sorted.map((ach) => (
                 <div
                   key={ach.api_name}
@@ -135,7 +138,6 @@ export function GameDetailsModal({ game, open, onOpenChange, onEdit, onDelete, t
                 </div>
               ))}
             </div>
-          </ScrollArea>
         ) : (
           <div className="py-10 text-center text-[#8f98a0]">
             <Trophy className="mx-auto mb-2 h-8 w-8 opacity-50" />

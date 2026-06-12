@@ -82,19 +82,17 @@ const [gameToEdit, setGameToEdit] = useState<Game | null>(null)
       const steamPlaytimes = await fetchSteamPlaytimes()
       const updatesList: PlaytimeUpdate[] = []
       games.forEach((game) => {
-        if (game.is_steam_playtime === 1) {
-          const fetched = steamPlaytimes[game.steam_id]
-          if (fetched && (game.playtime_hours !== fetched.hours || game.playtime_minutes !== fetched.minutes)) {
-            updatesList.push({
-              steam_id: game.steam_id,
-              name: game.name,
-              currentHours: game.playtime_hours,
-              currentMinutes: game.playtime_minutes,
-              newHours: fetched.hours,
-              newMinutes: fetched.minutes,
-              selected: true,
-            })
-          }
+        const fetched = steamPlaytimes[game.steam_id]
+        if (fetched && (game.playtime_hours !== fetched.hours || game.playtime_minutes !== fetched.minutes)) {
+          updatesList.push({
+            steam_id: game.steam_id,
+            name: game.name,
+            currentHours: game.playtime_hours,
+            currentMinutes: game.playtime_minutes,
+            newHours: fetched.hours,
+            newMinutes: fetched.minutes,
+            selected: true,
+          })
         }
       })
       setPlaytimeUpdates(updatesList)
@@ -112,6 +110,8 @@ const [gameToEdit, setGameToEdit] = useState<Game | null>(null)
       playtime_hours: u.newHours,
       playtime_minutes: u.newMinutes,
     }))
+    console.log("Bulk update payload:", JSON.stringify(selected))
+    console.log("Full playtimeUpdates:", JSON.stringify(playtimeUpdates))
     if (selected.length === 0) {
       setShowUpdatePlaytimeModal(false)
       return
@@ -121,8 +121,10 @@ const [gameToEdit, setGameToEdit] = useState<Game | null>(null)
       setShowUpdatePlaytimeModal(false)
       fetchGames()
       toast.success("Playtimes updated")
-    } catch {
-      toast.error("Failed to bulk update playtimes")
+    } catch (err: unknown) {
+      const data = (err as { response?: { data?: unknown } })?.response?.data as Record<string, unknown> | undefined
+      console.error("Bulk update error:", err, "response data:", JSON.stringify(data, null, 2))
+      toast.error(`Bulk update failed: ${JSON.stringify(data)}`)
     }
   }, [playtimeUpdates, bulkUpdatePlaytimes, token, fetchGames])
 
@@ -152,20 +154,27 @@ const [gameToEdit, setGameToEdit] = useState<Game | null>(null)
     (g) => g.name.toLowerCase().includes(searchTerm.toLowerCase()) || g.steam_id.includes(searchTerm),
   )
 
-  const displayedGames = [...filteredGames]
-  if (sortType === "first_added") {
-    displayedGames.reverse()
-  } else if (sortType !== "last_added") {
-    displayedGames.sort((a, b) => {
-      if (sortType === "most_achievements") return b.achievement_count - a.achievement_count
-      if (sortType === "least_achievements") return a.achievement_count - b.achievement_count
-      const pa = a.playtime_hours * 60 + a.playtime_minutes
-      const pb = b.playtime_hours * 60 + b.playtime_minutes
-      if (sortType === "most_playtime") return pb - pa
-      if (sortType === "least_playtime") return pa - pb
-      return 0
-    })
-  }
+  const displayedGames = [...filteredGames].sort((a, b) => {
+    if (sortType === "last_added") {
+      if (!a.date_added && !b.date_added) return 0
+      if (!a.date_added) return 1
+      if (!b.date_added) return -1
+      return b.date_added.localeCompare(a.date_added)
+    }
+    if (sortType === "first_added") {
+      if (!a.date_added && !b.date_added) return 0
+      if (!a.date_added) return 1
+      if (!b.date_added) return -1
+      return a.date_added.localeCompare(b.date_added)
+    }
+    if (sortType === "most_achievements") return b.achievement_count - a.achievement_count
+    if (sortType === "least_achievements") return a.achievement_count - b.achievement_count
+    const pa = a.playtime_hours * 60 + a.playtime_minutes
+    const pb = b.playtime_hours * 60 + b.playtime_minutes
+    if (sortType === "most_playtime") return pb - pa
+    if (sortType === "least_playtime") return pa - pb
+    return 0
+  })
 
   const stats = (() => {
     const totalAchievements = games.reduce((acc, g) => acc + g.achievement_count, 0)
@@ -240,7 +249,7 @@ const [gameToEdit, setGameToEdit] = useState<Game | null>(null)
       </div>
 
       <LoginModal open={showLogin} onOpenChange={setShowLogin} onLogin={handleLogin} />
-      <AddGameModal open={showAddModal} onOpenChange={(open) => { setShowAddModal(open); if (!open) setGameToEdit(null) }} games={games} token={token} onGameAdded={fetchGames} gameToEdit={gameToEdit} />
+      <AddGameModal key={gameToEdit?.steam_id ?? "add-game"} open={showAddModal} onOpenChange={(open) => { setShowAddModal(open); if (!open) setGameToEdit(null) }} games={games} token={token} onGameAdded={fetchGames} gameToEdit={gameToEdit} />
       <StatsModal
         open={showStatsModal}
         onOpenChange={setShowStatsModal}

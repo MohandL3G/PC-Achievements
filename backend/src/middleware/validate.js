@@ -14,6 +14,7 @@ const addGameSchema = z.object({
   total_achievements: z.number().int().min(0).default(0),
   image_url: z.string().optional().default(''),
   is_steam_playtime: z.union([z.boolean(), z.number()]).optional().default(false),
+  is_owned: z.union([z.boolean(), z.number()]).optional().default(false),
 });
 
 const updatePlaytimeSchema = z.object({

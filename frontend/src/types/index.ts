@@ -8,6 +8,8 @@ export interface Game {
   total_achievements: number
   image_url: string
   is_steam_playtime?: number
+  is_owned?: number
+  date_added?: string | null
   steam_playtime?: {
     hours: number
     minutes: number
