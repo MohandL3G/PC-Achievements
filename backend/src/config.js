@@ -27,13 +27,14 @@ const apiLimiter = rateLimit({
 const allowedOrigins = [
   'https://ach.mohandl3g.ly',
   'https://ach.mohandl3g.ddnsgeek.com',
+  'https://demonking.mohandl3g.ly',
+  'https://demonking.mohandl3g.ddnsgeek.com',
   'https://linword.mohandl3g.ly',
   'https://linword.mohandl3g.ddnsgeek.com',
   'http://internal.docker',
+  'http://host.docker.internal',
   'http://192.168.0.100',
   'http://localhost',
-  'http://localhost:5173',
-  'http://localhost:5000',
 ];
 
 const ADMIN_USERNAME = process.env.ADMIN_USERNAME || 'admin';
