@@ -34,4 +34,6 @@ const allowedOrigins = [
   'http://localhost:5000',
 ];
 
-module.exports = { PORT, loginLimiter, apiLimiter, allowedOrigins };
+const ADMIN_USERNAME = process.env.ADMIN_USERNAME || 'admin';
+
+module.exports = { PORT, loginLimiter, apiLimiter, allowedOrigins, ADMIN_USERNAME };

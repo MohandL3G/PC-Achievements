@@ -30,6 +30,9 @@ COPY --from=backend-builder /usr/src/app/backend ./
 # Copy built frontend assets to the backend's public folder
 COPY --from=frontend-builder /usr/src/app/frontend/dist ./public
 
+# Create uploads directory for avatars
+RUN mkdir -p /usr/src/app/uploads
+
 # Expose the server port
 EXPOSE 5000
 

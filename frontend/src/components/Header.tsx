@@ -1,9 +1,9 @@
+import { useEffect, useState } from "react"
 import { Search, Star, Pencil, LogIn, LogOut, Plus, RefreshCw, Trash2, TrendingUp } from "lucide-react"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { cn } from "@/lib/utils"
-import avatarImg from "@/assets/avatar.jpg"
 
 interface HeaderProps {
   isLoggedIn: boolean
@@ -46,14 +46,39 @@ export function Header({
   onSyncAchievements,
   onBulkDelete,
 }: HeaderProps) {
+  const [adminUsername, setAdminUsername] = useState("")
+  const [avatarError, setAvatarError] = useState(false)
+
+  useEffect(() => {
+    fetch("/api/config")
+      .then((r) => r.json())
+      .then((data) => setAdminUsername(data.adminUsername || "admin"))
+      .catch(() => setAdminUsername("admin"))
+  }, [])
+
   return (
     <header className="grid grid-cols-[1fr_auto_1fr] gap-5 border-b border-white/10 px-5 pb-5 pt-2">
       <div className="flex items-center gap-3">
-        <div className="flex h-10 w-10 cursor-pointer items-center justify-center overflow-hidden rounded-full" onClick={onStatsClick} title="View Stats">
-          <img src={avatarImg} alt="Profile" className="h-full w-full object-cover" />
+        <div
+          className="flex h-10 w-10 cursor-pointer items-center justify-center overflow-hidden rounded-full bg-[#2a475e]"
+          onClick={onStatsClick}
+          title="View Stats"
+        >
+          {avatarError ? (
+            <span className="text-sm font-bold text-white">
+              {adminUsername?.charAt(0).toUpperCase() || "?"}
+            </span>
+          ) : (
+            <img
+              src="/uploads/avatar.jpg"
+              alt="Profile"
+              className="h-full w-full object-cover"
+              onError={() => setAvatarError(true)}
+            />
+          )}
         </div>
         <div className="group flex items-center gap-2">
-          <span className="text-lg font-bold text-white">MohandL3G</span>
+          <span className="text-lg font-bold text-white">{adminUsername || "Guest"}</span>
           {isLoggedIn && (
             <button
               className={cn(
@@ -95,14 +120,14 @@ export function Header({
           </Select>
         </div>
 
-        <div className="flex items-center gap-1 text-lg font-bold text-[#ff3e3e] [text-shadow:0_0_10px_rgba(255,62,62,0.5)]">
+        <div className="flex items-center gap-1 text-lg font-bold text-[#ff3e3e] [text-shadow:0_0_10px rgba(255,62,62,0.5)]">
           <span>
             TOTAL COMPLETED GAMES: {gamesCount}
             {searchTerm && <span className="ml-1 text-xs text-[#8f98a0]">(Found: {filteredCount})</span>}
           </span>
           {gamesCount > 0 && (
             <Star
-              className="ml-2 h-5 w-5 cursor-pointer text-[#ff3e3e] transition-all hover:scale-110 hover:[text-shadow:0_0_15px_rgba(255,62,62,0.8)]"
+              className="ml-2 h-5 w-5 cursor-pointer text-[#ff3e3e] transition-all hover:scale-110 hover:[text-shadow:0_0_15px rgba(255,62,62,0.8)]"
               onClick={onStatsClick}
             />
           )}

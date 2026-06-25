@@ -6,7 +6,7 @@ const bodyParser = require('body-parser');
 const path = require('path');
 const morgan = require('morgan');
 
-const { PORT, apiLimiter, allowedOrigins } = require('./src/config');
+const { PORT, apiLimiter, allowedOrigins, ADMIN_USERNAME } = require('./src/config');
 const authRouter = require('./src/routes/auth');
 const gamesRouter = require('./src/routes/games');
 const steamRouter = require('./src/routes/steam');
@@ -48,6 +48,12 @@ app.use('/api', authRouter);
 app.use('/api/games', gamesRouter);
 app.use('/api/steam', steamRouter);
 app.use('/api', achievementsRouter);
+
+app.get('/api/config', (req, res) => {
+  res.json({ adminUsername: ADMIN_USERNAME });
+});
+
+app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
 const publicPath = path.join(__dirname, 'public');
 app.use(express.static(publicPath));

@@ -1,5 +1,5 @@
-import { describe, it, expect } from "vitest"
-import { render, screen } from "@testing-library/react"
+import { describe, it, expect, vi, beforeEach } from "vitest"
+import { render, screen, waitFor } from "@testing-library/react"
 import { Header } from "./Header"
 
 describe("Header", () => {
@@ -24,9 +24,16 @@ describe("Header", () => {
     onBulkDelete: () => {},
   }
 
-  it("renders the username", () => {
+  beforeEach(() => {
+    vi.restoreAllMocks()
+    globalThis.fetch = vi.fn().mockResolvedValue({
+      json: () => Promise.resolve({ adminUsername: "testuser" }),
+    })
+  })
+
+  it("renders the username from config", async () => {
     render(<Header {...defaultProps} />)
-    expect(screen.getByText("MohandL3G")).toBeDefined()
+    await waitFor(() => expect(screen.getByText("testuser")).toBeDefined())
   })
 
   it("shows SIGN IN when not logged in", () => {
