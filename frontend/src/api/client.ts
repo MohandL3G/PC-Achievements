@@ -17,6 +17,7 @@ api.interceptors.response.use(
   (err) => {
     if (err.response?.status === 401 || err.response?.status === 403) {
       localStorage.removeItem("token")
+      window.dispatchEvent(new CustomEvent("auth:logout"))
     }
     return Promise.reject(err)
   },

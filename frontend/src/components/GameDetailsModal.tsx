@@ -40,7 +40,7 @@ export function GameDetailsModal({ game, open, onOpenChange, onEdit, onDelete, t
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[800px] gap-0 p-0 max-h-[85vh] overflow-y-auto overflow-x-hidden">
+      <DialogContent className="sm:max-w-[1000px] gap-0 p-0 max-h-[85vh] overflow-y-scroll overflow-x-hidden [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-white/20 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar]:w-2">
           <div
             className="flex h-[220px] items-end bg-cover bg-center"
             style={{ backgroundImage: `url(${game.image_url})` }}
