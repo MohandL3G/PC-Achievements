@@ -41,6 +41,10 @@ jobs:
       - name: Frontend test
         run: cd frontend && npm test
 
+      - name: Install Docker CLI
+        run: apt-get update && apt-get install -y docker.io
+        if: github.ref == 'refs/heads/main'
+
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
         with:
