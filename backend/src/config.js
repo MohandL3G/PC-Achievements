@@ -27,6 +27,8 @@ const apiLimiter = rateLimit({
 const allowedOrigins = [
   'https://ach.mohandl3g.ly',
   'https://ach.mohandl3g.ddnsgeek.com',
+  'https://linword.mohandl3g.ly',
+  'https://linword.mohandl3g.ddnsgeek.com',
   'http://internal.docker',
   'http://192.168.0.100',
   'http://localhost',
