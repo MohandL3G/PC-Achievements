@@ -5,6 +5,7 @@ import { Input } from "@/components/ui/input"
 import { api } from "@/api/client"
 import type { Game } from "@/types"
 import { RefreshCw, Download, Clock } from "lucide-react"
+import { toast } from "sonner"
 
 interface AddGameModalProps {
   open: boolean
@@ -47,7 +48,7 @@ export function AddGameModal({ open, onOpenChange, games, token, onGameAdded, ga
       })
     } catch (err: unknown) {
       const axiosErr = err as { response?: { data?: { error?: string } } }
-      alert(axiosErr.response?.data?.error || "Failed to fetch game data")
+      toast.error(axiosErr.response?.data?.error || "Failed to fetch game data")
     } finally {
       setIsFetching(false)
     }
@@ -80,7 +81,7 @@ export function AddGameModal({ open, onOpenChange, games, token, onGameAdded, ga
       onOpenChange(false)
       onGameAdded()
     } catch {
-      alert("Failed to add/update game")
+      toast.error("Failed to add/update game")
     }
   }
 
@@ -94,10 +95,10 @@ export function AddGameModal({ open, onOpenChange, games, token, onGameAdded, ga
         setPlaytimeHours(res.data.steam_playtime.hours)
         setPlaytimeMinutes(res.data.steam_playtime.minutes)
       } else {
-        alert("No Steam playtime found for this game.")
+        toast.error("No Steam playtime found for this game.")
       }
     } catch {
-      alert("Failed to fetch updated playtime from Steam.")
+      toast.error("Failed to fetch updated playtime from Steam.")
     } finally {
       setIsFetching(false)
     }
